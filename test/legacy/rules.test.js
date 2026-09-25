@@ -167,7 +167,17 @@ describe('legacy rules: defects reproduced', () => {
     // occurred only twice — but the notation strings form a 4-ply cycle.
     // Newest first: the nine plies 2.Ke2 ... 6.Ke2 as they reach the client.
     setWhitePerspectiveBoard(ctx, { e1: 'wK', e8: 'bK', e4: 'wP', e5: 'bP' });
-    ctx.n턴전기보 = ['.Ke2', '...Ke8', '.Ke1', '...Ke7', '.Ke2', '...Ke8', '.Ke1', '...Ke7', '.Ke2'];
+    ctx.n턴전기보 = [
+      '.Ke2',
+      '...Ke8',
+      '.Ke1',
+      '...Ke7',
+      '.Ke2',
+      '...Ke8',
+      '.Ke1',
+      '...Ke7',
+      '.Ke2',
+    ];
     legacy.handlers.get('turnend')({ 일차기보: '...Ke8', 오십수체크: 10 });
     expect(lastEmit('gameend')).toMatchObject({ 승자: 0, 정산결과: '108' });
   });

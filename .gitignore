@@ -1,3 +1,6 @@
 node_modules
-.prettierrc
 .env
+dist/
+coverage/
+test-results/
+playwright-report/
