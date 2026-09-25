@@ -369,7 +369,9 @@ setInterval(renderClock, 250);
 
 /** Sound effects of the original game, triggered by snapshot changes. */
 function playSounds(previous: RoomSnapshot | null, next: RoomSnapshot): void {
-  const before = previous?.game;
+  // The first snapshot after loading the page is not an event to announce.
+  if (!previous) return;
+  const before = previous.game;
   const after = next.game;
   if (!after) return;
   const me = state.session?.playerId;
