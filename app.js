@@ -21,7 +21,7 @@ app.get('/', function (request, response) {
 });
 //이미지관련
 app.get('/images0', function (request, response) {
-  fs.readFile('./static/images/blank.png', function (err, data) {
+  fs.readFile('./public/images/blank.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -32,7 +32,7 @@ app.get('/images0', function (request, response) {
   });
 });
 app.get('/images1', function (request, response) {
-  fs.readFile('./static/images/black_bishop.png', function (err, data) {
+  fs.readFile('./public/images/pieces/black_bishop.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -43,7 +43,7 @@ app.get('/images1', function (request, response) {
   });
 });
 app.get('/images2', function (request, response) {
-  fs.readFile('./static/images/black_king.png', function (err, data) {
+  fs.readFile('./public/images/pieces/black_king.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -54,7 +54,7 @@ app.get('/images2', function (request, response) {
   });
 });
 app.get('/images3', function (request, response) {
-  fs.readFile('./static/images/black_knight.png', function (err, data) {
+  fs.readFile('./public/images/pieces/black_knight.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -65,7 +65,7 @@ app.get('/images3', function (request, response) {
   });
 });
 app.get('/images4', function (request, response) {
-  fs.readFile('./static/images/black_pawn.png', function (err, data) {
+  fs.readFile('./public/images/pieces/black_pawn.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -76,7 +76,7 @@ app.get('/images4', function (request, response) {
   });
 });
 app.get('/images5', function (request, response) {
-  fs.readFile('./static/images/black_queen.png', function (err, data) {
+  fs.readFile('./public/images/pieces/black_queen.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -87,7 +87,7 @@ app.get('/images5', function (request, response) {
   });
 });
 app.get('/images6', function (request, response) {
-  fs.readFile('./static/images/black_rook.png', function (err, data) {
+  fs.readFile('./public/images/pieces/black_rook.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -98,7 +98,7 @@ app.get('/images6', function (request, response) {
   });
 });
 app.get('/images7', function (request, response) {
-  fs.readFile('./static/images/white_bishop.png', function (err, data) {
+  fs.readFile('./public/images/pieces/white_bishop.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -109,7 +109,7 @@ app.get('/images7', function (request, response) {
   });
 });
 app.get('/images8', function (request, response) {
-  fs.readFile('./static/images/white_king.png', function (err, data) {
+  fs.readFile('./public/images/pieces/white_king.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -120,7 +120,7 @@ app.get('/images8', function (request, response) {
   });
 });
 app.get('/images9', function (request, response) {
-  fs.readFile('./static/images/white_knight.png', function (err, data) {
+  fs.readFile('./public/images/pieces/white_knight.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -131,7 +131,7 @@ app.get('/images9', function (request, response) {
   });
 });
 app.get('/images10', function (request, response) {
-  fs.readFile('./static/images/white_pawn.png', function (err, data) {
+  fs.readFile('./public/images/pieces/white_pawn.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -142,7 +142,7 @@ app.get('/images10', function (request, response) {
   });
 });
 app.get('/images11', function (request, response) {
-  fs.readFile('./static/images/white_queen.png', function (err, data) {
+  fs.readFile('./public/images/pieces/white_queen.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -153,7 +153,7 @@ app.get('/images11', function (request, response) {
   });
 });
 app.get('/images12', function (request, response) {
-  fs.readFile('./static/images/white_rook.png', function (err, data) {
+  fs.readFile('./public/images/pieces/white_rook.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -164,7 +164,7 @@ app.get('/images12', function (request, response) {
   });
 });
 app.get('/images13', function (request, response) {
-  fs.readFile('./static/images/이동가능지점.png', function (err, data) {
+  fs.readFile('./public/images/move-hint.png', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -175,7 +175,7 @@ app.get('/images13', function (request, response) {
   });
 });
 app.get('/sound1', function (request, response) {
-  fs.readFile('./static/sound/수를 둠.mp3', function (err, data) {
+  fs.readFile('./public/sounds/move.mp3', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -186,7 +186,7 @@ app.get('/sound1', function (request, response) {
   });
 });
 app.get('/sound2', function (request, response) {
-  fs.readFile('./static/sound/승.mp3', function (err, data) {
+  fs.readFile('./public/sounds/victory.mp3', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -197,7 +197,7 @@ app.get('/sound2', function (request, response) {
   });
 });
 app.get('/sound3', function (request, response) {
-  fs.readFile('./static/sound/시계소리.mp3', function (err, data) {
+  fs.readFile('./public/sounds/clock-warning.mp3', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -208,7 +208,7 @@ app.get('/sound3', function (request, response) {
   });
 });
 app.get('/sound4', function (request, response) {
-  fs.readFile('./static/sound/시작.mp3', function (err, data) {
+  fs.readFile('./public/sounds/game-start.mp3', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -219,7 +219,7 @@ app.get('/sound4', function (request, response) {
   });
 });
 app.get('/sound5', function (request, response) {
-  fs.readFile('./static/sound/체크당함.mp3', function (err, data) {
+  fs.readFile('./public/sounds/check.mp3', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -230,7 +230,7 @@ app.get('/sound5', function (request, response) {
   });
 });
 app.get('/sound6', function (request, response) {
-  fs.readFile('./static/sound/턴넘어옴.mp3', function (err, data) {
+  fs.readFile('./public/sounds/your-turn.mp3', function (err, data) {
     if (err) {
       console.log('err');
     } else {
@@ -241,7 +241,7 @@ app.get('/sound6', function (request, response) {
   });
 });
 app.get('/sound7', function (request, response) {
-  fs.readFile('./static/sound/패배무승부.mp3', function (err, data) {
+  fs.readFile('./public/sounds/defeat-or-draw.mp3', function (err, data) {
     if (err) {
       console.log('err');
     } else {
