@@ -36,6 +36,10 @@ function sanBody(position: Position, move: Move): string {
  * b1 and f3 both going to d2 were written "Nd2" instead of "Nbd2".)
  */
 function disambiguation(position: Position, move: Move): string {
+  const sameKind = position.board.filter(
+    (piece) => piece?.color === move.color && piece.type === move.piece,
+  );
+  if (sameKind.length < 2) return '';
   const rivals = legalMoves(position).filter(
     (other) => other.piece === move.piece && other.to === move.to && other.from !== move.from,
   );
