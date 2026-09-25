@@ -11,6 +11,8 @@ export interface GameServerOptions {
   readonly room?: RoomOptions;
   /** Socket events allowed per second and socket before requests are refused. */
   readonly eventsPerSecond?: number;
+  /** New connections allowed per minute and client address. */
+  readonly connectionsPerMinute?: number;
 }
 
 export interface ChessServerOptions extends GameServerOptions {
@@ -100,6 +102,21 @@ export function attachGameServer(
     options.room,
   );
   const eventsPerSecond = options.eventsPerSecond ?? 20;
+
+  // Every connection without a known session creates a player and a join
+  // notice, so connection floods are limited per client address.
+  const connectionLimiters = new Map<string, RateLimiter>();
+  const connectionsPerMinute = options.connectionsPerMinute ?? 30;
+  io.use((socket, next) => {
+    const address = socket.handshake.address;
+    if (connectionLimiters.size > 10_000) connectionLimiters.clear();
+    let limiter = connectionLimiters.get(address);
+    if (!limiter) {
+      limiter = new RateLimiter(connectionsPerMinute, 60_000);
+      connectionLimiters.set(address, limiter);
+    }
+    next(limiter.tryTake() ? undefined : new Error('rate-limited'));
+  });
 
   io.on('connection', (socket: ClientSocket) => {
     // History first, so the join notice produced by connect() is not duplicated.

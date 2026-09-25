@@ -97,6 +97,17 @@ socket.on('disconnect', () => {
   dom.banner.textContent = '서버와 연결이 끊어졌습니다. 다시 연결하는 중…';
   dom.banner.hidden = false;
 });
+socket.on('connect_error', () => {
+  dom.banner.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도합니다…';
+  dom.banner.hidden = false;
+  // A refusal by the server (e.g. connection rate limit) is not retried
+  // automatically, unlike network errors.
+  if (!socket.active) {
+    setTimeout(() => {
+      socket.connect();
+    }, 5000);
+  }
+});
 socket.on('session', (session) => {
   saveToken(session.token);
   chat.setMyId(session.playerId);

@@ -233,3 +233,17 @@ describe('HTTP', () => {
     expect(response.headers.get('access-control-allow-origin')).toBeNull();
   });
 });
+
+describe('connection flood protection', () => {
+  it('refuses too many new connections from one address', async () => {
+    await server.close();
+    await start({ connectionsPerMinute: 2 });
+    await connect({ name: 'a' });
+    await connect({ name: 'b' });
+    const socket: Client = connectClient(url, { transports: ['websocket'], forceNew: true });
+    clients.push(socket);
+    const error = await new Promise<Error>((resolve) => socket.once('connect_error', resolve));
+    expect(error.message).toBe('rate-limited');
+    expect(server.room.snapshot().online).toBe(2);
+  });
+});
