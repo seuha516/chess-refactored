@@ -271,18 +271,13 @@ function 참가인원() {
 
 var 게임중 = 0;
 
-const option = {
-  ca: fs.readFileSync(`${process.env.SSL_KEY_PATH}fullchain.pem`),
-  key: fs.readFileSync(`${process.env.SSL_KEY_PATH}privkey.pem`),
-  cert: fs.readFileSync(`${process.env.SSL_KEY_PATH}cert.pem`),
-};
-const httpsServer = require('https').createServer(option, app);
-const io = require('socket.io')(httpsServer, {
+const httpServer = require('http').createServer(app);
+const io = require('socket.io')(httpServer, {
   cors: { origin: '*' },
 });
-const port = process.env.PORT;
-httpsServer.listen(port, () => {
-  console.log(`[HTTPS] Server is started on port ${port}`);
+const port = Number(process.env.PORT) || 3000;
+httpServer.listen(port, () => {
+  console.log(`[HTTP] Server is started on http://localhost:${port}`);
 });
 
 io.on('connection', function (socket) {
