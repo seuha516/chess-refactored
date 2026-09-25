@@ -1,8 +1,4 @@
-# Legacy sources are kept byte-for-byte until they are replaced.
-app.js
-Chess.html
-static/
+README.md
 package-lock.json
 dist/
 coverage/
-README.md

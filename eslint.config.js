@@ -4,8 +4,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    // Legacy sources are replaced later in the history and are not linted.
-    ignores: ['app.js', 'static/**', 'test/legacy/**', 'dist/**', 'coverage/**'],
+    ignores: ['dist/**', 'coverage/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

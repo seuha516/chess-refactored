@@ -5,5 +5,5 @@
     "types": ["node"]
   },
   "include": ["src/shared", "src/server", "test", "*.config.ts"],
-  "exclude": ["test/legacy", "test/e2e"]
+  "exclude": ["test/e2e"]
 }
