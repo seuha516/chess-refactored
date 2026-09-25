@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="1대1 체스 웹 게임" />
+    <title>Chess</title>
+    <link rel="icon" href="/images/pieces/white_king.png" />
+    <link rel="stylesheet" href="./style.css" />
+    <script type="module" src="./main.ts"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <h1 class="title">Chess</h1>
+      <div class="clock" id="clock" hidden>
+        <img class="clock-king" id="clock-king" src="/images/pieces/white_king.png" alt="" />
+        <span class="clock-time" id="clock-time" role="timer" aria-live="off">3:00</span>
+      </div>
+      <div class="captured" aria-label="잡힌 기물">
+        <div
+          class="captured-row captured-white"
+          id="captured-white"
+          aria-label="잡힌 백 기물"
+        ></div>
+        <div
+          class="captured-row captured-black"
+          id="captured-black"
+          aria-label="잡힌 흑 기물"
+        ></div>
+      </div>
+    </header>
+
+    <p class="connection-banner" id="connection-banner" role="status" hidden></p>
+
+    <main class="layout">
+      <section class="board-area" aria-label="체스판">
+        <div class="board" id="board" role="grid" aria-label="체스판"></div>
+        <div class="result" id="result" hidden>
+          <p class="result-title" id="result-title"></p>
+          <p class="result-reason" id="result-reason"></p>
+          <button type="button" class="result-close" id="result-close">닫기</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="대국 정보">
+        <div class="players">
+          <span class="player player-1" id="player-1">(대기중)</span>
+          <span class="vs">VS</span>
+          <span class="player player-2" id="player-2">(대기중)</span>
+        </div>
+        <p class="status" id="status" role="status"></p>
+        <ol class="moves" id="moves" aria-label="기보"></ol>
+        <div class="controls">
+          <button type="button" id="seat-take" hidden>참가</button>
+          <button type="button" id="seat-leave" hidden>취소</button>
+          <button type="button" id="draw-offer" hidden>무승부 신청</button>
+          <button type="button" id="draw-accept" hidden>무승부 수락</button>
+          <button type="button" id="draw-decline" hidden>거절</button>
+          <button type="button" id="resign" hidden>기권</button>
+          <button type="button" id="flip" class="secondary">판 뒤집기</button>
+        </div>
+      </section>
+
+      <section class="chat" aria-label="채팅">
+        <ul class="chat-log" id="chat-log" aria-live="polite"></ul>
+        <form class="chat-form" id="chat-form">
+          <label class="visually-hidden" for="chat-input">메시지</label>
+          <input
+            id="chat-input"
+            type="text"
+            maxlength="200"
+            autocomplete="off"
+            placeholder="메시지를 입력해주세요.."
+          />
+          <button type="submit">전송</button>
+        </form>
+        <p class="my-info">
+          <span id="my-name"></span>
+          <button type="button" class="link" id="rename">이름 변경</button>
+        </p>
+      </section>
+    </main>
+
+    <dialog id="name-dialog" aria-labelledby="name-dialog-title">
+      <form method="dialog" id="name-form">
+        <h2 id="name-dialog-title">사용할 닉네임을 입력해주세요.</h2>
+        <input id="name-input" type="text" maxlength="16" autocomplete="nickname" required />
+        <p class="hint">1~16자. 비워두면 익명으로 참가합니다.</p>
+        <div class="dialog-actions">
+          <button type="submit" value="ok">확인</button>
+          <button type="submit" value="cancel" formnovalidate class="secondary">취소</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="promotion-dialog" aria-labelledby="promotion-dialog-title">
+      <form method="dialog">
+        <h2 id="promotion-dialog-title">승진할 기물을 고르세요</h2>
+        <div class="promotion-choices" id="promotion-choices"></div>
+        <div class="dialog-actions">
+          <button type="submit" value="cancel" class="secondary">취소</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>

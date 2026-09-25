@@ -1,0 +1,164 @@
+import { describe, expect, it } from 'vitest';
+import { INITIAL_FEN, parseSquare } from '../../src/shared/chess/index.ts';
+import type { GameSnapshot, PlayerInfo, RoomSnapshot } from '../../src/shared/protocol.ts';
+import { buildView, formatClock, type ClientState } from '../../src/client/view-model.ts';
+
+const alice: PlayerInfo = { id: 'alice', name: 'Alice', connected: true };
+const bob: PlayerInfo = { id: 'bob', name: 'Bob', connected: true };
+
+function game(overrides: Partial<GameSnapshot> = {}): GameSnapshot {
+  return {
+    id: 1,
+    white: alice,
+    black: bob,
+    fen: INITIAL_FEN,
+    moves: [],
+    status: 'playing',
+    outcome: null,
+    remainingMs: 180_000,
+    drawOffer: null,
+    ...overrides,
+  };
+}
+
+function state(me: string | null, room: Partial<RoomSnapshot>, extra: Partial<ClientState> = {}) {
+  const snapshot: RoomSnapshot = { seats: [], game: null, online: 2, ...room };
+  const base: ClientState = {
+    session: me ? { token: 'x'.repeat(16), playerId: me, name: me } : null,
+    room: snapshot,
+    selected: null,
+    pending: false,
+    flipped: false,
+    dismissedResult: null,
+  };
+  return { ...base, ...extra };
+}
+
+const sq = (name: string) => parseSquare(name) ?? -1;
+
+describe('buildView', () => {
+  it('shows the lobby with seat controls', () => {
+    const view = buildView(state('carol', { seats: [alice] }));
+    expect(view.players).toEqual([{ text: 'Alice', connected: true, me: false }, null]);
+    expect(view.controls).toMatchObject({ seatTake: true, seatLeave: false, draw: 'hidden' });
+    expect(view.status).toBe('참가 버튼을 눌러 대국에 참가하세요. (1/2)');
+    expect(view.clock).toBeNull();
+  });
+
+  it('lets a seated player cancel', () => {
+    const view = buildView(state('alice', { seats: [alice] }));
+    expect(view.controls).toMatchObject({ seatTake: false, seatLeave: true });
+    expect(view.status).toBe('상대를 기다리는 중입니다. (1/2)');
+  });
+
+  it('only offers moves to the player whose turn it is', () => {
+    const white = buildView(state('alice', { game: game() }));
+    expect(white.myColor).toBe('w');
+    expect(white.legalMoves).toHaveLength(20);
+    expect(white.status).toBe('당신의 차례입니다.');
+    const black = buildView(state('bob', { game: game() }));
+    expect(black.legalMoves).toHaveLength(0);
+    expect(black.status).toBe('Alice(백)의 차례입니다.');
+    const spectator = buildView(state('carol', { game: game() }));
+    expect(spectator.legalMoves).toHaveLength(0);
+    expect(spectator.controls).toMatchObject({ resign: false, draw: 'hidden', seatTake: false });
+  });
+
+  it('does not allow moving while a move request is pending', () => {
+    expect(buildView(state('alice', { game: game() }, { pending: true })).legalMoves).toEqual([]);
+  });
+
+  it('shows the legal targets of the selected piece', () => {
+    const view = buildView(state('alice', { game: game() }, { selected: sq('g1') }));
+    expect([...view.board.targets].sort()).toEqual([sq('f3'), sq('h3')].sort());
+  });
+
+  it('orients the board for each player and lets anyone flip it', () => {
+    expect(buildView(state('bob', { game: game() })).board.orientation).toBe('b');
+    expect(buildView(state('carol', { game: game() })).board.orientation).toBe('w');
+    expect(buildView(state('carol', { game: game() }, { flipped: true })).board.orientation).toBe(
+      'b',
+    );
+  });
+
+  it('highlights the last move and a king in check', () => {
+    const view = buildView(
+      state('alice', {
+        game: game({
+          fen: 'rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3',
+          moves: [
+            { san: 'f3', uci: 'f2f3', color: 'w', captured: null },
+            { san: 'e5', uci: 'e7e5', color: 'b', captured: null },
+            { san: 'g4', uci: 'g2g4', color: 'w', captured: null },
+            { san: 'Qh4#', uci: 'd8h4', color: 'b', captured: null },
+          ],
+          status: 'finished',
+          outcome: { winner: 'b', reason: 'checkmate' },
+          remainingMs: null,
+        }),
+      }),
+    );
+    expect(view.board.lastMove).toEqual({ from: sq('d8'), to: sq('h4') });
+    expect(view.board.check).toBe(sq('e1'));
+    expect(view.moveRows).toEqual(['1. f3 e5', '2. g4 Qh4#']);
+    expect(view.result).toEqual({ title: '패배', reason: '체크메이트에 의해', tone: 'loss' });
+  });
+
+  it('describes results for spectators and draws', () => {
+    const finished = (winner: 'w' | 'b' | null) =>
+      game({
+        status: 'finished',
+        outcome: { winner, reason: winner ? 'timeout' : 'agreement' },
+        remainingMs: null,
+      });
+    expect(buildView(state('carol', { game: finished('w') })).result).toEqual({
+      title: '백 승리',
+      reason: '시간 초과에 의해',
+      tone: 'neutral',
+    });
+    expect(buildView(state('bob', { game: finished(null) })).result?.title).toBe('무승부');
+    expect(
+      buildView(state('bob', { game: finished('b') }, { dismissedResult: 1 })).result,
+    ).toBeNull();
+  });
+
+  it('lists captured pieces by colour in the original order', () => {
+    const view = buildView(
+      state('alice', {
+        game: game({
+          moves: [
+            { san: 'x', uci: 'a1a2', color: 'w', captured: 'q' },
+            { san: 'x', uci: 'a1a2', color: 'w', captured: 'p' },
+            { san: 'x', uci: 'a1a2', color: 'b', captured: 'n' },
+          ],
+        }),
+      }),
+    );
+    expect(view.captured).toEqual({ w: ['n'], b: ['p', 'q'] });
+  });
+
+  it('shows the draw controls for each side of an offer', () => {
+    const offered = game({ drawOffer: 'w' });
+    expect(buildView(state('alice', { game: offered })).controls.draw).toBe('offered');
+    expect(buildView(state('bob', { game: offered })).controls.draw).toBe('respond');
+    expect(buildView(state('bob', { game: offered })).status).toContain(
+      '상대가 무승부를 제안했습니다.',
+    );
+  });
+
+  it('warns when the player to move is disconnected', () => {
+    const view = buildView(state('bob', { game: game({ white: { ...alice, connected: false } }) }));
+    expect(view.status).toContain('Alice님의 연결이 끊겼습니다');
+  });
+});
+
+describe('formatClock', () => {
+  it('formats minutes and seconds, rounding up', () => {
+    expect(formatClock(180_000)).toBe('3:00');
+    expect(formatClock(179_001)).toBe('3:00');
+    expect(formatClock(179_000)).toBe('2:59');
+    expect(formatClock(9_500)).toBe('0:10');
+    expect(formatClock(0)).toBe('0:00');
+    expect(formatClock(-50)).toBe('0:00');
+  });
+});

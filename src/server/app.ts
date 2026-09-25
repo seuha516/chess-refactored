@@ -7,20 +7,26 @@ import { RateLimiter } from './rate-limit.ts';
 import { GameRoom, type Player, type RoomOptions } from './room.ts';
 import { isAck, parseChatText, parseMoveRequest, parseName } from './validation.ts';
 
-export interface ChessServerOptions {
-  /** Directory with the built client (index.html, assets). Omit to serve no files. */
-  readonly staticDir?: string;
+export interface GameServerOptions {
   readonly room?: RoomOptions;
   /** Socket events allowed per second and socket before requests are refused. */
   readonly eventsPerSecond?: number;
 }
 
-export interface ChessServer {
-  readonly httpServer: HttpServer;
+export interface ChessServerOptions extends GameServerOptions {
+  /** Directory with the built client (index.html, assets). Omit to serve no files. */
+  readonly staticDir?: string;
+}
+
+export interface GameServer {
   readonly io: Server<ClientToServerEvents, ServerToClientEvents>;
   readonly room: GameRoom;
-  listen(port: number, host?: string): Promise<AddressInfo>;
   close(): Promise<void>;
+}
+
+export interface ChessServer extends GameServer {
+  readonly httpServer: HttpServer;
+  listen(port: number, host?: string): Promise<AddressInfo>;
 }
 
 /** Largest accepted Socket.IO message; real payloads are well under 1 KiB. */
@@ -47,9 +53,10 @@ const securityHeaders: RequestHandler = (_request, response, next) => {
 type ClientSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 /**
- * Creates the HTTP + Socket.IO server around a single GameRoom. The client is
- * served from the same origin, so no CORS configuration is needed (the
- * original allowed any origin with `cors: { origin: '*' }`).
+ * Creates the HTTP server (static client + security headers) with the game
+ * attached. The client is served from the same origin, so no CORS
+ * configuration is needed (the original allowed any origin with
+ * `cors: { origin: '*' }`).
  */
 export function createChessServer(options: ChessServerOptions = {}): ChessServer {
   const app = express();
@@ -58,6 +65,29 @@ export function createChessServer(options: ChessServerOptions = {}): ChessServer
   if (options.staticDir) app.use(express.static(options.staticDir));
 
   const httpServer = createServer(app);
+  const game = attachGameServer(httpServer, options);
+  return {
+    ...game,
+    httpServer,
+    listen: (port, host) =>
+      new Promise((resolve, reject) => {
+        httpServer.once('error', reject);
+        httpServer.listen(port, host, () => {
+          httpServer.off('error', reject);
+          resolve(httpServer.address() as AddressInfo);
+        });
+      }),
+  };
+}
+
+/**
+ * Attaches Socket.IO and a GameRoom to an existing HTTP server. Used by
+ * createChessServer and by the Vite dev server plugin (vite.config.ts).
+ */
+export function attachGameServer(
+  httpServer: HttpServer,
+  options: GameServerOptions = {},
+): GameServer {
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     serveClient: false,
     maxHttpBufferSize: MAX_MESSAGE_BYTES,
@@ -88,17 +118,8 @@ export function createChessServer(options: ChessServerOptions = {}): ChessServer
   });
 
   return {
-    httpServer,
     io,
     room,
-    listen: (port, host) =>
-      new Promise((resolve, reject) => {
-        httpServer.once('error', reject);
-        httpServer.listen(port, host, () => {
-          httpServer.off('error', reject);
-          resolve(httpServer.address() as AddressInfo);
-        });
-      }),
     close: async () => {
       room.dispose();
       await io.close();

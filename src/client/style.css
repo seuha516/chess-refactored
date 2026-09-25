@@ -1,0 +1,529 @@
+/* Colours are taken from the original Chess.css / Chess.html. */
+:root {
+  --square: clamp(34px, calc((100vw - 24px) / 8), 60px);
+  --light: rgb(254 206 160);
+  --dark: rgb(211 138 69);
+  --light-last: rgb(254 236 160);
+  --dark-last: rgb(211 168 69);
+  --check: rgb(167 37 37);
+  --panel: lightgray;
+  --chat: #accfda;
+  --focus: #1d6fe8;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    'Malgun Gothic',
+    'Apple SD Gothic Neo',
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: black;
+  color: #111;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: white;
+  color: #111;
+  padding: 0.25em 0.75em;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+button.secondary {
+  background: #eee;
+}
+
+button.link {
+  border: 0;
+  background: none;
+  padding: 0;
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ top bar */
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 10px 12px 6px;
+}
+
+.title {
+  margin: 0;
+  color: white;
+  font-size: 40px;
+  font-weight: bold;
+}
+
+.clock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.clock[hidden] {
+  display: none;
+}
+
+.clock-king {
+  width: 55px;
+  height: 55px;
+  border: 2px solid #ff9999;
+  border-radius: 16px;
+  background: #222;
+}
+
+.clock-time {
+  min-width: 3.2ch;
+  color: lightgray;
+  font:
+    italic bold 32px 'Arial Black',
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock.low .clock-time {
+  color: #ff6b6b;
+}
+
+.captured {
+  flex: 1 1 260px;
+  min-height: 60px;
+  border: 1px solid white;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.captured-row {
+  display: flex;
+  flex-wrap: wrap;
+  min-height: 30px;
+  padding: 0 4px;
+}
+
+.captured-white {
+  background: black;
+}
+
+.captured-black {
+  background: white;
+}
+
+.captured-row img {
+  width: 30px;
+  height: 30px;
+}
+
+.connection-banner {
+  max-width: 780px;
+  margin: 0 auto 8px;
+  padding: 8px 12px;
+  background: indianred;
+  color: white;
+  border-radius: 6px;
+}
+
+/* ------------------------------------------------------------- layout */
+
+.layout {
+  display: grid;
+  grid-template-columns: calc(var(--square) * 8) minmax(240px, 1fr);
+  grid-template-areas:
+    'board panel'
+    'chat chat';
+  gap: 12px;
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 12px 20px;
+}
+
+@media (width < 720px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'board'
+      'panel'
+      'chat';
+    justify-items: center;
+  }
+
+  .panel,
+  .chat {
+    width: 100%;
+  }
+}
+
+/* -------------------------------------------------------------- board */
+
+.board-area {
+  grid-area: board;
+  position: relative;
+  width: calc(var(--square) * 8);
+}
+
+.board {
+  display: grid;
+  width: calc(var(--square) * 8);
+  user-select: none;
+  touch-action: none;
+}
+
+.board-row {
+  display: flex;
+}
+
+.square {
+  position: relative;
+  width: var(--square);
+  height: var(--square);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: default;
+  font-weight: bold;
+}
+
+.square.light {
+  background: var(--light);
+  color: var(--dark);
+}
+
+.square.dark {
+  background: var(--dark);
+  color: var(--light);
+}
+
+.square.light.last-move {
+  background: var(--light-last);
+}
+
+.square.dark.last-move {
+  background: var(--dark-last);
+}
+
+.square.check {
+  background: var(--check);
+}
+
+.square.selected {
+  box-shadow: inset 0 0 0 3px rgb(0 0 0 / 55%);
+}
+
+.square.movable {
+  cursor: grab;
+}
+
+.square.target {
+  cursor: pointer;
+}
+
+/* The original move-hint image, drawn over the target square. */
+.square.target::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('/images/move-hint.png') center / contain no-repeat;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.square.capture-target::after {
+  background: none;
+  box-shadow: inset 0 0 0 4px rgb(0 0 0 / 60%);
+  border-radius: 50%;
+}
+
+.square:focus-visible {
+  outline-offset: -3px;
+  z-index: 1;
+}
+
+.square .piece {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.square.dragging .piece {
+  opacity: 0.3;
+}
+
+.coord {
+  position: absolute;
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.coord-rank {
+  top: 2px;
+  left: 2px;
+}
+
+.coord-file {
+  right: 3px;
+  bottom: 2px;
+}
+
+.drag-ghost {
+  position: fixed;
+  top: calc(var(--square) / -2);
+  left: calc(var(--square) / -2);
+  width: var(--square);
+  height: var(--square);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.result {
+  position: absolute;
+  inset: 30% 10% auto;
+  padding: 16px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 88%);
+  text-align: center;
+}
+
+.result[hidden] {
+  display: none;
+}
+
+.result-title {
+  margin: 0;
+  font-size: 44px;
+  font-weight: 700;
+  color: #2f4a11;
+}
+
+.result[data-tone='win'] .result-title {
+  color: #b90000;
+}
+
+.result[data-tone='loss'] .result-title {
+  color: #200084;
+}
+
+.result-reason {
+  margin: 4px 0 12px;
+  font-weight: 700;
+  color: #141029;
+}
+
+/* -------------------------------------------------------------- panel */
+
+.panel {
+  grid-area: panel;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: calc(var(--square) * 8);
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+@media (width < 720px) {
+  .panel {
+    min-height: 0;
+  }
+}
+
+.players {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.player {
+  overflow-wrap: anywhere;
+}
+
+.player-1 {
+  color: #d00000;
+}
+
+.player-2 {
+  color: #0000d0;
+}
+
+.player.me {
+  text-decoration: underline;
+}
+
+.player.offline {
+  opacity: 0.5;
+}
+
+.status {
+  min-height: 2.6em;
+  margin: 0;
+  font-weight: 600;
+}
+
+.status.error {
+  color: #b00020;
+}
+
+.moves {
+  flex: 1 1 120px;
+  max-height: 260px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.moves li {
+  margin-top: 2px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgb(241 230 202);
+  color: rgb(41 41 41);
+  font-weight: 675;
+  letter-spacing: 1px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.controls button[hidden] {
+  display: none;
+}
+
+/* --------------------------------------------------------------- chat */
+
+.chat {
+  grid-area: chat;
+  padding: 12px 16px;
+  border-radius: 20px;
+  background: var(--chat);
+}
+
+.chat-log {
+  height: 200px;
+  margin: 0 0 10px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.chat-log li {
+  margin-top: 6px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+
+.chat-log .notice {
+  background: rgb(98 179 255);
+}
+
+.chat-log .mine {
+  background: lemonchiffon;
+}
+
+.chat-log .other {
+  background: white;
+}
+
+.chat-form {
+  display: flex;
+  gap: 10px;
+}
+
+.chat-form input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  font-size: 16px;
+}
+
+.my-info {
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
+/* ------------------------------------------------------------ dialogs */
+
+dialog {
+  border: 0;
+  border-radius: 10px;
+  padding: 20px;
+}
+
+dialog h2 {
+  margin-top: 0;
+  font-size: 18px;
+}
+
+dialog input {
+  width: 100%;
+  height: 32px;
+  font-size: 16px;
+}
+
+.hint {
+  font-size: 13px;
+  color: #555;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.promotion-choices {
+  display: flex;
+  gap: 8px;
+}
+
+.promotion-choice {
+  padding: 4px;
+}
+
+.promotion-choice img {
+  display: block;
+  width: 56px;
+  height: 56px;
+}
