@@ -263,6 +263,9 @@ dom.nameDialog.addEventListener('close', () => {
 
 function render(): void {
   board.render(view.board);
+  // Moves played so far; lets automated tests wait for the server's answer.
+  dom.board.dataset.ply = String(state.room?.game?.moves.length ?? 0);
+  dom.board.dataset.status = state.room?.game?.status ?? 'none';
 
   const [first, second] = view.players;
   for (const [node, label] of [
