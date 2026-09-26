@@ -2,27 +2,27 @@
 version: 1
 slug: "src-client-index-html"
 primary_target: "src/client/index.html"
-related_targets: ["src/client/style.css","src/client/main.ts"]
+related_targets: ["src/client/style.css","src/client/main.ts","src/client/scene"]
 ---
 
 # Chess client (lobby + room)
 
-Scope: the whole browser client, src/client (lobby, room, dialogs). Visitor mode: Operate.
+Scope: the whole browser client, src/client (lobby, room, dialogs). Visitor mode: Operate, with the board as an Experience moment.
 Audience: friends who open an invite link on laptop or phone to play one casual game; spectators chat.
 Task: pick a name, sit down, play on a 15+10 clock, offer draw / resign, play again.
-Constraints: E2E ids and Korean copy the tests read; keyboard, click and drag input; no framework.
-Memorable moment: the empty chair at the table edge with the join button on it; opponent moves slide across the stone.
+Constraints: E2E ids and Korean copy the tests read; keyboard, click and drag input; no framework; a 2D board when WebGL is missing; prefers-reduced-motion honoured.
+Memorable moment: a capture — the attacker slams down, the game freezes for a beat, the taken piece spins off the table edge and lands beside the board; a mate topples the king in slow motion.
 
 ## Direction contract
 
-THESIS: The room is a park stone chess table. Players sit at its top and bottom edges; spectators stand around the bench. Refuses the category default of a dark app with a wooden board beside a generic info panel.
+THESIS: The room is a real stone chess table in a park at golden hour, rendered live in 3D; every move is a stone hitting stone. Refuses the category default of a flat top-down board beside a rounded info card, and the "3D chess" default of a glossy studio void.
 
-OWN-WORLD: Pale granite plaza ground, a dark polished granite rim framing a travertine/slate inlaid board, coordinates engraved on the rim. Ink is green-black; the single colour is park-bench green, used only where something is active (running clock, primary action, selection). Check is red. Pieces are newly drawn carved-stone SVG silhouettes. Pretendard, tabular numerals for clocks. Stated raises: literal name plaques (quote grammar); colour only on the active edge (cloud edge); one fixed rule per board state (one-bit desktop); the square size is the layout module (Dumbar).
+OWN-WORLD: Low warm sun through a tree canopy: dappled leaf light drifts across a polished dark granite slab with an inlaid travertine/slate board and engraved coordinates; the surroundings fall into cool green-black shade. Pieces are carved alabaster and black basalt. UI is shade: green-black ground, stone-white text, hairlines, 4px cut corners, no cards or pills. Sunlight is the only accent: what is active stands in the light (running clock, selection, targets, primary action). Check is red. Hahmlet (engraved serif) for room names, results and clocks; Pretendard for everything else.
 
-STORY: A friend opens the link, names themself, sees the table with an empty chair facing them, sits, plays, and after the result plaque presses "한 판 더".
+STORY: A friend opens the link, sees the table from above the park, the camera settles to their chair, they sit; pieces rain onto the board; they play with weight and sound; after the toppled king and the title band they press "한 판 더".
 
-FIRST VIEWPORT: Desktop: board column centered-left at viewport height (opponent seat strip, rimmed board, my seat strip), a 360px side column to the right with status, actions, move sheet and chat. Phone: full-width board between the two seat strips, status and actions directly below, move strip and chat after. Lobby: header, a create form, then a plan of tables, each drawn from above with its two seats.
+FIRST VIEWPORT: Desktop room: the 3D table fills everything left of a 380px shade column; the opponent's plate and clock sit over the far edge, mine over the near edge; the column holds the referee line, actions, score sheet and chat. Phone: plates above and below a near-top-down table spanning the width, the column's content follows. Lobby: the live table idles under the canopy on the right half (top on phones); the left holds the Hahmlet heading, create form and the list of tables.
 
-FORM: Park stone chess table, candidate 6 of 7 on the ordered list; seed key 04ba1936.
+FORM: User-pinned extension of the park stone table (seed key 04ba1936, candidate 6 of 7) into a real-time 3D world; no new roll. Signature interaction: escalating impact grammar (move → capture hit-stop and knock-off → check shudder → mate slow-motion topple), plus the camera fly-in and 180° orbit on flip.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance

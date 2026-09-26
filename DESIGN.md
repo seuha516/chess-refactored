@@ -1,43 +1,59 @@
 ---
 name: Chess
-description: 링크 하나로 친구와 두는 1대1 체스. 공원의 돌 체스 테이블.
+description: 링크 하나로 친구와 두는 1대1 체스. 해 질 녘 공원의 돌 체스 테이블, 실시간 3D.
 colors:
-  plaza: '#d5d7d2'
-  slab: '#e8e9e5'
-  slab-recessed: '#cfd2cb'
-  field: '#f4f5f2'
-  line: '#bfc3bb'
-  line-strong: '#9da199'
-  ink: '#1c211f'
-  ink-secondary: '#454c48'
-  ink-tertiary: '#5a615d'
-  granite: '#2c312e'
-  granite-engraving: '#bdb7aa'
-  travertine-square: '#e6decb'
-  slate-square: '#7c8a80'
-  bench-green: '#2f5a45'
-  bench-green-pressed: '#234535'
-  on-green: '#f4f1ea'
-  check-red: '#b3261e'
-  notice-amber: '#ecd79c'
+  shade-deep: '#0a0f0d'
+  shade: '#101714'
+  shade-panel: '#141c19'
+  shade-raised: '#1b2521'
+  shade-hover: '#25312c'
+  line: 'rgba(232, 224, 204, 0.11)'
+  line-strong: 'rgba(232, 224, 204, 0.24)'
+  stone-text: '#ede6d6'
+  stone-text-secondary: '#b9b1a0'
+  stone-text-tertiary: '#918b7e'
+  sun: '#f5c77e'
+  sun-strong: '#ffd999'
+  sun-ink: '#22190b'
+  sun-core: '#fff0cf'
+  check-red: '#e5604a'
+  check-red-strong: '#c8412c'
+  check-glow: '#ff4a2e'
+  travertine-square: '#e2d6bd'
+  slate-square: '#5f6d64'
+  granite: '#26292a'
+  alabaster-piece: '#efe7d8'
+  basalt-piece: '#2a2e2d'
 typography:
   display:
-    fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif"
-    fontSize: 'clamp(32px, 5vw, 46px)'
+    fontFamily: "'Hahmlet Variable', 'Nanum Myeongjo', serif"
+    fontSize: 'clamp(44px, 6vw, 76px)'
+    fontWeight: 700
+    lineHeight: 1.02
+    letterSpacing: '-0.025em'
+  result:
+    fontFamily: "'Hahmlet Variable', 'Nanum Myeongjo', serif"
+    fontSize: 'clamp(56px, 7.5vw, 104px)'
     fontWeight: 800
-    lineHeight: 1.1
-    letterSpacing: '-0.035em'
-  headline:
-    fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif"
-    fontSize: '20px'
-    fontWeight: 750
-    lineHeight: 1.3
+    lineHeight: 1
     letterSpacing: '-0.02em'
+  clock:
+    fontFamily: "'Hahmlet Variable', 'Nanum Myeongjo', serif"
+    fontSize: '30px'
+    fontWeight: 600
+    lineHeight: 1
+    letterSpacing: '0.01em'
+    fontFeature: "'tnum'"
+  headline:
+    fontFamily: "'Hahmlet Variable', 'Nanum Myeongjo', serif"
+    fontSize: '21px'
+    fontWeight: 650
+    lineHeight: 1.2
   title:
     fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif"
-    fontSize: '16px'
+    fontSize: '17px'
     fontWeight: 650
-    lineHeight: 1.45
+    lineHeight: 1.25
   body:
     fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif"
     fontSize: '15px'
@@ -46,255 +62,224 @@ typography:
   label:
     fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif"
     fontSize: '13px'
-    fontWeight: 600
-    lineHeight: 1.4
-  clock:
-    fontFamily: "'Pretendard Variable', Pretendard, system-ui, sans-serif"
-    fontSize: '24px'
     fontWeight: 650
-    lineHeight: 1
-    letterSpacing: '0.01em'
-    fontFeature: "'tnum'"
+    lineHeight: 1.4
 rounded:
-  control: '8px'
-  panel: '14px'
-  dialog: '16px'
-  pill: '999px'
+  hairline: '2px'
+  cut: '4px'
+  dialog: '6px'
 spacing:
   xs: '6px'
-  sm: '10px'
+  sm: '12px'
   md: '16px'
   lg: '24px'
-  xl: '32px'
+  xl: '48px'
 components:
   button:
-    backgroundColor: '{colors.slab}'
-    textColor: '{colors.ink}'
-    rounded: '{rounded.control}'
-    padding: '0 14px'
-    height: '38px'
-  button-hover:
-    backgroundColor: '{colors.field}'
+    backgroundColor: 'transparent'
+    textColor: '{colors.stone-text}'
+    rounded: '{rounded.cut}'
+    padding: '0 15px'
+    height: '40px'
   button-primary:
-    backgroundColor: '{colors.bench-green}'
-    textColor: '{colors.on-green}'
-    rounded: '{rounded.control}'
-    padding: '0 14px'
-    height: '38px'
+    backgroundColor: '{colors.sun}'
+    textColor: '{colors.sun-ink}'
+    rounded: '{rounded.cut}'
+    padding: '0 15px'
+    height: '40px'
   button-primary-hover:
-    backgroundColor: '{colors.bench-green-pressed}'
+    backgroundColor: '{colors.sun-strong}'
   button-danger:
     backgroundColor: '{colors.check-red}'
-    textColor: '#ffffff'
-    rounded: '{rounded.control}'
+    textColor: '#1a0805'
+    rounded: '{rounded.cut}'
   input:
-    backgroundColor: '{colors.field}'
-    textColor: '{colors.ink}'
-    rounded: '{rounded.control}'
-    padding: '0 12px'
-    height: '42px'
+    backgroundColor: '{colors.shade-deep}'
+    textColor: '{colors.stone-text}'
+    rounded: '{rounded.cut}'
+    padding: '0 14px'
+    height: '44px'
   clock-idle:
-    backgroundColor: '{colors.slab-recessed}'
-    textColor: '{colors.ink-secondary}'
+    backgroundColor: 'rgba(10, 15, 13, 0.78)'
+    textColor: '{colors.stone-text-secondary}'
     typography: '{typography.clock}'
-    rounded: '{rounded.control}'
-    padding: '7px 12px'
+    rounded: '{rounded.cut}'
+    padding: '8px 14px 7px'
   clock-running:
-    backgroundColor: '{colors.bench-green}'
-    textColor: '{colors.on-green}'
+    backgroundColor: '{colors.sun}'
+    textColor: '{colors.sun-ink}'
   side-panel:
-    backgroundColor: '{colors.slab}'
-    rounded: '{rounded.panel}'
+    backgroundColor: '{colors.shade-panel}'
+    rounded: '0'
 ---
 
 # Design System: Chess
 
 ## Overview
 
-**Creative North Star: "The Park Stone Table"**
+**Creative North Star: "The Park Table at Golden Hour"**
 
-The room is a stone chess table in a city park. Two players sit at its top and bottom edges;
-spectators stand around it and talk. The page ground is pale granite paving, the board is an inlay
-of warm travertine and cool slate framed by a dark polished granite rim, and the coordinates are
-engraved on that rim. Everything else is flat, quiet stone so the board and the clocks carry the
-screen.
+The room is a real stone chess table in a park, drawn live in 3D (three.js). A low sun comes
+through a tree canopy: dappled light drifts across a polished dark granite slab with an inlaid
+travertine and slate board, the coordinates are engraved on the slab for whoever sits at the near
+edge, and everything around the table falls into cool green-black shade. Pieces are carved
+alabaster and black basalt. Every move is stone meeting stone, and the table acts it out.
 
-This is an Operate surface: people come to play one game. Density is moderate, hierarchy comes from
-type weight and position rather than containers, and colour is almost absent. The one colour, park
-bench green, appears only where something is active right now. The world is light because the
-table lives in daylight; there is no dark theme.
+The interface around the table is shade: flat green-black ground, stone-white text, hairlines, 4px
+cut corners. There are no cards, pills or panels with shadows. It stays an Operate surface: the
+board, the clocks and the next action carry the screen, and the 3D scene never hides a control.
 
 **Key Characteristics:**
 
-- A dark granite table with an inlaid board is the only heavy object on the page.
-- Seats, not panels: each player is a strip on their edge of the table with name, taken pieces and
-  clock.
-- Colour means "active": the running clock, the latest move, the primary action, the selection.
-- The square size is the layout module; board, rim and columns derive from it.
-- Newly drawn carved-stone piece silhouettes (SVG, 45x45 viewBox).
+- The 3D table is the only lit object; the UI is the shade around it.
+- Sunlight is the only accent: what is active stands in the light.
+- Impact escalates with the event: move, capture, check, mate.
+- The DOM board is laid invisibly over the 3D board and keeps input, focus and screen-reader text.
+- Two faces: Hahmlet (engraved serif) for names on stone, results and clocks; Pretendard for the rest.
 
 ## Colors
 
-A cool granite neutral scale around one warm inlay, with a single green for whatever is active.
+A green-black shade scale, warm stone-white text, and one colour of light.
 
 ### Primary
 
-- **Park Bench Green** (#2f5a45): running clock, latest move in the move sheet, primary buttons
-  (참가, 방 만들기, 한 판 더), selected square tint (55% alpha), target hover, focus rings, the
-  invite button while a player waits alone. Pressed/hover state Bench Green Pressed (#234535). Text
-  on it is On Green (#f4f1ea).
+- **Sunlight** (#f5c77e): the running clock, the primary action (방 만들기, 참가, 한 판 더), the
+  latest move in the sheet, the "your turn" status, the invite button while waiting alone, focus
+  rings, the material lead (+3), a room in play in the lobby. Hover Sun Strong (#ffd999). Text on it
+  is Sun Ink (#22190b, 11:1).
+- In the scene the same light marks the selected piece (a warm pool under it), legal targets (small
+  pools of light with a Sun Core #fff0cf centre) and capture targets (a ring of light round the
+  piece), and the last move (a 20–30% wash on both squares).
 
 ### Neutral
 
-- **Granite Plaza** (#d5d7d2): page ground and sticky top bar.
-- **Slab** (#e8e9e5): the side column, lobby tables, dialogs, default buttons.
-- **Recessed Slab** (#cfd2cb): idle clock, confirm bar.
-- **Field** (#f4f5f2): inputs, other people's chat bubbles, button hover.
-- **Line** (#bfc3bb) and **Strong Line** (#9da199): hairline dividers; input and button borders.
-- **Ink** (#1c211f), **Ink Secondary** (#454c48), **Ink Tertiary** (#5a615d): text. Tertiary only on
-  Slab or lighter.
-- **Polished Granite** (#2c312e) with a fleck tile (public/images/granite.svg): the table rim and the
-  lobby's mini boards only. **Rim Engraving** (#bdb7aa) for coordinates on it.
-- **Travertine** (#e6decb) and **Slate** (#7c8a80): light and dark squares; also the promotion
-  choices' ground.
+- **Shade** (#101714): page ground, scene fog and background. **Deep Shade** (#0a0f0d): inputs, the
+  confirm bar. **Panel Shade** (#141c19): the side column and dialogs. **Raised** (#1b2521) and
+  **Hover** (#25312c): promotion choices, scrollbars.
+- **Line** (stone-white at 11%) and **Strong Line** (24%): hairline dividers, button borders.
+- **Stone Text** (#ede6d6), **Secondary** (#b9b1a0), **Tertiary** (#918b7e, ≥4.5:1 on Panel Shade).
+- **Travertine** (#e2d6bd) and **Slate** (#5f6d64): board squares in the 2D fallback and the lobby's
+  mini tables. **Granite** (#26292a): their frame.
 
 ### State colours
 
-- **Check Red** (#b3261e): the king in check (radial glow), a running clock under 30 seconds,
-  resign confirmation, error text.
-- **Last move**: a wash in the stone's own tones over both squares: ink `rgb(28 33 31 / 21%)` on
-  travertine, light `rgb(236 234 226 / 32%)` on slate.
-- **Destination marks** (`--mark`): ink at 48% on travertine, light at 92% on slate, so dots and
-  capture rings keep 3:1 against their square.
-- **Notice Amber** (#ecd79c): the connection banner, the only non-stone colour outside play.
+- **Check Red** (#e5604a): a clock under 30 seconds (the running one blinks between Check Red and
+  #c8412c), resign confirmation, errors. In the scene the king in check stands in a pulsing
+  red glow (#ff4a2e).
 
 ### Named Rules
 
-**The Active Edge Rule.** Green marks only what is active at this moment. A decorative green
-element makes the running clock harder to find.
+**The Light Means Active Rule.** Sunlight marks only what is active now. A decorative warm element
+competes with the running clock and the lit targets.
 
-**The One Rule Per State Rule.** On the board, `::before` tints a square (last move, selection,
-check) and `::after` marks a destination (dot for a move, ring for a capture). No state borrows
-another's mark.
+**The Shade Rule.** UI surfaces are flat shade with hairlines. No colored glows, no glass, no
+gradients except the functional scrims that keep type readable over the scene's edges.
 
 ## Typography
 
-**Font:** Pretendard Variable (self-hosted from the `pretendard` npm package, dynamic subset), with
-system Korean fallbacks. One family for everything; tabular numerals for clocks, counts and move
-numbers.
-
-**Character:** A neutral Korean workhorse set with firm weights; hierarchy comes from weight
-(500–800) and size, never from a second family.
+**Display font:** Hahmlet Variable (`@fontsource-variable/hahmlet`, SIL OFL 1.1), an engraved
+Korean serif, for the lobby heading, room names, result titles, clocks, move numbers and the
+coordinates cut into the slab.
+**UI font:** Pretendard Variable (dynamic subset) for everything else.
 
 ### Hierarchy
 
-- **Display** (800, clamp(32px, 5vw, 46px), 1.1, -0.035em): the lobby heading only.
-- **Headline** (750, 20px): dialog titles; room title in the top bar at 700/17px.
-- **Title** (650, 16px): seat names, the status line, lobby table names (700).
-- **Body** (400, 15px, 1.5): chat, lead text (17px on the lobby).
-- **Label** (600, 12.5–13.5px): counts, seat tags (나 · 백), time control, buttons in the controls
-  row.
-- **Clock** (650, 24px, tabular): seat clocks; 22px on phones.
+- **Display** (Hahmlet 700, clamp(44px, 6vw, 76px), 1.02): the lobby heading 대국실.
+- **Result** (Hahmlet 800, clamp(56px, 7.5vw, 104px)): 승리 (sunlight), 패배 (secondary), 무승부.
+- **Clock** (Hahmlet 600, 30px, tabular; 26px on phones).
+- **Headline** (Hahmlet 650, 21px): room title; room names in the lobby at 20px; dialog titles 24px.
+- **Title** (Pretendard 650, 17–18px): seat names, the status line.
+- **Body** (Pretendard 400, 15px): chat, lead text at 17.5px.
+- **Label** (Pretendard 600–700, 13–14px): counts, tags, controls.
 
 **The Keep-All Rule.** Korean text uses `word-break: keep-all` so words never split across lines.
 
 ## Layout
 
-- **Module:** `--square` = clamp(40px, min((100dvh − 236px) / 8.7, (100vw − 88px − side) / 8.7),
-  88px); `--rim` = 0.35 × square; `--board` = 8 squares + 2 rims. The board fills the viewport height
-  on desktop.
-- **Room (≥900px):** two columns, board column (seat, table, seat) and a side column (360px, 320px
-  below 1180px) that matches the board column's height exactly (absolutely positioned inner) with
-  status/actions, move sheet (2 parts) and chat (3 parts).
-- **Room (<900px):** one column; the side column follows the board; the move sheet becomes one
-  horizontally scrolling line; the chat log is 260px tall.
-- **Phones (<600px):** the board runs full width inside a thin 6px granite rim; coordinates move
-  inside the squares; seats and side content keep a 12px gutter.
-- **Lobby:** max 1080px, heading, lead and create form, then a grid of tables
-  (auto-fill, minmax(232px, 1fr); 160px below 720px).
-- **Spacing:** 6 / 10 / 16 / 24 / 32px; more space above a section than inside it.
+- **Room (≥900px):** the stage (3D table) fills everything left of a side column (380px, 340px below
+  1180px). A transparent top bar spans both: back and room title over the stage, invite, sound and
+  name over the column. The opponent's seat strip sits under the top bar, mine at the bottom; the
+  camera frames the board in the safe area between them (`--safe-*` insets on `.scene`).
+- **Camera:** 30° field of view; elevation 50° on wide stages rising to 64° on tall ones so the
+  far squares stay tappable; the distance is fitted to the safe area every resize.
+- **Room (<900px):** top bar, opponent strip, the table (0.9 × screen width tall), my strip, then
+  status/actions, the move sheet as one scrolling line, chat.
+- **Lobby:** heading, create form and the list of tables on the left (620px); the live table idles
+  on the right half, slowly orbiting; on phones it sits on top (46vh).
+- **Spacing:** 6 / 12 / 16 / 24 / 48px.
 
 ## Elevation & Depth
 
-Flat stone at rest; depth belongs to objects that physically stand above the plaza.
+Depth is real: the scene has a sun (spot light with a canopy cookie and PCF shadows), sky fill and
+reflections from a generated sky. The UI casts almost nothing.
 
-### Shadow Vocabulary
+- **Clock** `0 6px 14px -6px rgb(0 0 0 / 60%)` while running.
+- **Dialog** hairline plus `0 40px 80px -24px rgb(0 0 0 / 80%)` over a 62% shade backdrop.
+- **Banner** `0 16px 32px -12px rgb(0 0 0 / 60%)`.
 
-- **Table** (`inset 0 1px 0 rgb(255 255 255 / 9%), 0 2px 3px rgb(28 33 31 / 18%), 0 22px 40px -18px rgb(28 33 31 / 55%)`):
-  the granite table only.
-- **Plaque** (`0 2px 4px rgb(28 33 31 / 16%), 0 30px 56px -18px rgb(28 33 31 / 60%)`): the flat
-  travertine result plaque on the board.
-- **Dialog** (`0 32px 64px -24px rgb(28 33 31 / 60%)`) over a 45% ink backdrop.
-- **Lifted piece** (`drop-shadow(0 8px 6px rgb(28 33 31 / 35%))`): the piece being dragged.
-- **Hover lift** (mini table rises 3px, its shadow deepens to `0 18px 22px -12px`): lobby tables.
+## Motion
 
-**The Heavy Object Rule.** Only the table, the plaque, dialogs and a lifted piece cast shadows.
-Panels separate with hairlines, not shadows.
+- **Arrival:** entering a room, the camera comes down from above the park to the chair (1.5s).
+  Flipping the board orbits the camera 180° with a small rise (1.1s).
+- **Move:** the piece is lifted (opponent's: 0.1s), thrown on an arc (0.26–0.52s; knights higher)
+  and lands hard: dust ring, a small shake, a click-and-knock sound pitched by piece weight.
+- **Capture:** freeze 60–160ms by the value taken, shake and punch-in, stone chips, a flash; the
+  taken piece spins off and lands beside the capturer's side of the board.
+- **Check:** the king shudders, a red glow pulses under it, a low knock and a tense ring.
+- **Mate:** the hit, slow motion (0.4×), the camera closes in, the king topples, a boom; the title
+  band opens (clip-path) and the result is thrown down onto the table (1.75s after the move).
+  Resignation, time and disconnection topple the king without slow motion; draws topple nothing.
+- **New game:** every piece arcs home and the fallen king stands up.
+- Reduced motion: no shake, freeze, slow motion or camera flights; moves are 0.14s slides.
 
-## Shapes
+## Sound
 
-Controls 8px, panels 14px, the result plaque 12px, dialogs 16px, seat pucks and chat bubbles round (chat
-bubbles 12px with a 4px corner toward the speaker). The table rim radius follows the rim
-(0.4 × rim + 4px); the board inside is square-cornered.
+Synthesised with Web Audio (no files): stone clicks and knocks, captures with grit, check, mate,
+topple, setup cascade, promotion, clock ticks (at 30 seconds, then each of the last ten), chimes
+for a draw offer or someone sitting down. A toggle in the top bar, remembered in the browser.
 
 ## Components
 
 ### Seat strip (signature)
 
-52px row on the table edge: colour puck (22px; cream, charcoal, or dashed when empty), name (650)
-with tags (나 · 백 · 연결 끊김 · 대기 중), pieces this player took (22px, overlapping by 7px) with the
-material lead (+3), and the clock at the far end. An empty seat reads "빈 자리" and carries the
-참가 button; the viewer's own waiting seat carries 일어나기. A new occupant settles in with a 260ms
-rise.
+56px row: colour puck (20px, flat alabaster or basalt with a hairline), name with tags (나 · 백 ·
+연결 끊김 · 대기 중), pieces taken with the sunlit material lead, and the clock. An empty seat reads
+빈 자리 and carries 참가.
 
-### Table and board
+### Stage and board
 
-Granite rim with engraved coordinates, travertine/slate squares as buttons, SVG pieces. Moves slide
-190ms (cubic-bezier(0.2, 0.8, 0.25, 1)), castling slides the rook too; reduced motion skips it.
+`.scene` holds the canvas and the DOM board; the board is a 512px grid mapped onto the 3D board
+with a `matrix3d` homography, transparent, with a 4px sunlight focus ring. Without WebGL the same
+grid is the 2D board (travertine/slate, SVG pieces, granite rim).
 
 ### Buttons
 
-- **Shape:** 8px, 38px tall (34px in the controls row), 600 weight.
-- **Default:** Slab with Strong Line border; hover Field. **Primary:** Bench Green. **Danger:** Check
-  Red, only for confirming resignation. **Ghost:** transparent, 7% ink on hover.
-- **Pressed:** translateY(1px). **Focus:** 2px green outline, 2px offset.
+4px cut corners, 40px (36px in controls). Default: transparent with Strong Line border. Primary:
+Sunlight. Danger: Check Red, only to confirm resignation. Ghost: no border.
 
-### Confirm bar
+### Result band
 
-Resign and draw offer take a second press: the controls row is replaced by a Recessed Slab bar with
-the question, the action and 취소. It closes by itself after 6 seconds or on Escape.
+A full-width shade band (84%) with hairlines across the table at 36% height, the result in Hahmlet
+800 with the reason and 한 판 더 / 닫기.
 
-### Inputs
+### Lobby table row
 
-42px, Field background, Strong Line border, green caret; focus turns the border and outline green.
-
-### Result plaque
-
-A flat travertine plaque (#e6decb, 1px ink hairline) centered on the board: result (800, up to 46px;
-green for a win), reason, then the join button and 닫기. While the plaque is shown the seat's 참가
-button moves onto it (labelled 한 판 더 or 참가하기), so there is only one join button, and the status
-line leads with the result.
-
-### Lobby table
-
-No card: each room is a mini table (112px granite frame, 8×8 checker) standing on the plaza between
-its two seat pills, with the room name and status (green dot while playing) below. The table rises
-on hover and the name underlines.
+No card: rows separated by hairlines; a 44px mini board between two seat marks (sunlit while
+playing), the room name in Hahmlet, status and players, an arrow that slides on hover.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** derive board, rim and column sizes from `--square`.
-- **Do** keep green for the active thing: running clock, latest move, primary action, selection.
-- **Do** keep text on Plaza at Ink Secondary or darker; Ink Tertiary only on Slab or lighter.
-- **Do** give every new board state its own mark on `::before` (tint) or `::after` (destination).
+- **Do** keep sunlight for the active thing, in the UI and in the scene.
+- **Do** act out every board change the server reports; snap when it cannot be explained as one move.
+- **Do** keep every control in the DOM, over or beside the canvas.
+- **Do** scale impact with the event.
 
 ### Don't:
 
-- **Don't** add shadows to panels, lists or buttons; they belong to heavy objects only.
-- **Don't** use the granite fleck texture anywhere but the table and mini tables.
+- **Don't** put colored glows, glass or gradients on UI surfaces.
+- **Don't** imitate materials in CSS; material lives in the scene.
+- **Don't** use cards, pills or radii above 6px.
+- **Don't** let the scene cover the status, the clocks or a primary action.
 - **Don't** use a browser `confirm()` or `alert()`; use the confirm bar.
-- **Don't** put green on permanent chrome; the brand mark is granite.
-- **Don't** wrap a lobby table in a card; it stands on the plaza.
-- **Don't** introduce a second typeface or a dark theme without a new direction decision.

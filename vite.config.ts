@@ -33,6 +33,8 @@ export default defineConfig({
   build: {
     outDir: '../../dist/client',
     emptyOutDir: true,
+    // three.js (the 3D table) is one lazily loaded chunk of about 600 kB.
+    chunkSizeWarningLimit: 700,
   },
   plugins: [gameServer()],
 });

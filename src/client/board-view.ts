@@ -17,6 +17,17 @@ export interface BoardHandlers {
   drop(from: Square, to: Square): void;
 }
 
+/**
+ * The 3D table, when there is one: it draws the pieces and the drag, while
+ * this view keeps the input, focus and screen-reader text.
+ */
+export interface BoardPresenter {
+  hover(square: Square | null): void;
+  dragStart(from: Square, x: number, y: number): void;
+  dragMove(x: number, y: number, over: Square | null): void;
+  dragEnd(): void;
+}
+
 /** Where the coordinates engraved on the table rim go. */
 export interface BoardRim {
   readonly ranks: HTMLElement;
@@ -64,6 +75,7 @@ export class BoardView {
   #suppressClick = false;
   /** A move dropped by drag is already where it belongs; do not slide it. */
   #dropped: { from: Square; to: Square } | null = null;
+  #presenter: BoardPresenter | null = null;
 
   constructor(root: HTMLElement, handlers: BoardHandlers, rim: BoardRim | null = null) {
     this.#root = root;
@@ -84,6 +96,18 @@ export class BoardView {
     root.addEventListener('pointermove', this.#onPointerMove);
     root.addEventListener('pointerup', this.#onPointerUp);
     root.addEventListener('pointercancel', this.#cancelDrag);
+    root.addEventListener('pointerover', (event) => {
+      this.#presenter?.hover(this.#squareFromEvent(event.target));
+    });
+    root.addEventListener('pointerleave', () => {
+      this.#presenter?.hover(null);
+    });
+  }
+
+  /** Hands the pieces and the drag over to the 3D table (or back, with null). */
+  setPresenter(presenter: BoardPresenter | null): void {
+    this.#presenter = presenter;
+    this.#root.classList.toggle('is-3d', presenter !== null);
   }
 
   render(model: BoardModel): void {
@@ -93,7 +117,9 @@ export class BoardView {
     if (orientationChanged) this.#layout(model.orientation);
     for (const [square, button] of this.#squares) this.#renderSquare(square, button, model);
     if (previous && model.ply !== previous.ply) {
-      if (!orientationChanged && model.ply === previous.ply + 1) this.#slide(model);
+      if (!orientationChanged && model.ply === previous.ply + 1 && !this.#presenter) {
+        this.#slide(model);
+      }
       this.#dropped = null;
     }
   }
@@ -284,8 +310,14 @@ export class BoardView {
       if (this.#model?.selected !== drag.from) this.#handlers.activate(drag.from);
       drag.ghost = document.createElement('img');
       drag.ghost.className = 'drag-ghost';
-      drag.ghost.src = pieceImage(piece);
       drag.ghost.alt = '';
+      if (this.#presenter) {
+        // The 3D table lifts the piece itself.
+        drag.ghost.hidden = true;
+        this.#presenter.dragStart(drag.from, event.clientX, event.clientY);
+      } else {
+        drag.ghost.src = pieceImage(piece);
+      }
       document.body.append(drag.ghost);
       this.#squares.get(drag.from)?.classList.add('dragging');
       // Capture only once a drag has started: capturing on pointerdown would
@@ -294,6 +326,7 @@ export class BoardView {
     }
     drag.ghost.style.transform = `translate(${String(event.clientX)}px, ${String(event.clientY)}px)`;
     const over = this.#squareFromEvent(document.elementFromPoint(event.clientX, event.clientY));
+    this.#presenter?.dragMove(event.clientX, event.clientY, over);
     if (over !== drag.over) {
       if (drag.over !== null) this.#squares.get(drag.over)?.classList.remove('drop-hover');
       drag.over = over;
@@ -320,6 +353,7 @@ export class BoardView {
   #cancelDrag = (): void => {
     const drag = this.#drag;
     if (!drag) return;
+    if (drag.ghost) this.#presenter?.dragEnd();
     drag.ghost?.remove();
     this.#squares.get(drag.from)?.classList.remove('dragging');
     if (drag.over !== null) this.#squares.get(drag.over)?.classList.remove('drop-hover');

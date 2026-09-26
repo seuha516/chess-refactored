@@ -1,38 +1,38 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-26T19:00:00+09:00",
+  "generatedAt": "2026-09-26T21:00:00+09:00",
   "title": "Design System: Chess",
   "extensions": {
     "colorMeta": {
-      "plaza": { "role": "neutral", "displayName": "Granite Plaza", "canonical": "#d5d7d2", "tonalRamp": ["#232522", "#393c38", "#51544f", "#6b6e69", "#878a84", "#a4a7a1", "#c2c4bf", "#e1e2de"] },
-      "slab": { "role": "neutral", "displayName": "Slab", "canonical": "#e8e9e5", "tonalRamp": ["#242522", "#3b3c39", "#535551", "#6d6f6b", "#898b86", "#a6a8a3", "#c5c7c2", "#e8e9e5"] },
-      "ink": { "role": "neutral", "displayName": "Green-Black Ink", "canonical": "#1c211f", "tonalRamp": ["#1c211f", "#313734", "#474e4a", "#5f6762", "#79817c", "#949b96", "#b0b6b2", "#cdd2cf"] },
-      "granite": { "role": "neutral", "displayName": "Polished Granite", "canonical": "#2c312e", "tonalRamp": ["#1a1e1c", "#2c312e", "#414743", "#585f5a", "#717873", "#8c928e", "#a8adaa", "#c6cac7"] },
-      "travertine-square": { "role": "neutral", "displayName": "Travertine", "canonical": "#e6decb", "tonalRamp": ["#2c271c", "#453e30", "#605745", "#7c725e", "#998f78", "#b7ad95", "#d2c9b2", "#eee7d6"] },
-      "slate-square": { "role": "neutral", "displayName": "Slate", "canonical": "#7c8a80", "tonalRamp": ["#1d231f", "#323a35", "#49524c", "#616c65", "#7c8a80", "#98a49c", "#b5bfb8", "#d4dbd6"] },
-      "bench-green": { "role": "primary", "displayName": "Park Bench Green", "canonical": "#2f5a45", "tonalRamp": ["#10231a", "#1c3a2c", "#2f5a45", "#44755d", "#5d9178", "#7fae96", "#a6cab7", "#d0e5da"] },
-      "check-red": { "role": "tertiary", "displayName": "Check Red", "canonical": "#b3261e", "tonalRamp": ["#3d0b08", "#621410", "#8a1d17", "#b3261e", "#d0493f", "#e27a71", "#efaaa4", "#f8d6d2"] }
+      "shade": { "role": "neutral", "displayName": "Shade", "canonical": "#101714", "tonalRamp": ["#0a0f0d", "#101714", "#141c19", "#1b2521", "#25312c", "#334039", "#46554d", "#5f6d64"] },
+      "stone-text": { "role": "neutral", "displayName": "Stone Text", "canonical": "#ede6d6", "tonalRamp": ["#5f5a50", "#77726a", "#918b7e", "#a59e90", "#b9b1a0", "#cfc8b8", "#ede6d6", "#f7f2e8"] },
+      "sun": { "role": "primary", "displayName": "Sunlight", "canonical": "#f5c77e", "tonalRamp": ["#22190b", "#4a3614", "#7a5a22", "#b08236", "#dca552", "#f5c77e", "#ffd999", "#fff0cf"] },
+      "check-red": { "role": "tertiary", "displayName": "Check Red", "canonical": "#e5604a", "tonalRamp": ["#1a0805", "#4d140b", "#8a2618", "#c8412c", "#e5604a", "#f07a64", "#f6a89a", "#fbd6cf"] },
+      "travertine-square": { "role": "neutral", "displayName": "Travertine", "canonical": "#e2d6bd", "tonalRamp": ["#2c271c", "#453e30", "#605745", "#7c725e", "#998f78", "#b7ad95", "#d2c9b2", "#e2d6bd"] },
+      "slate-square": { "role": "neutral", "displayName": "Slate", "canonical": "#5f6d64", "tonalRamp": ["#1d231f", "#323a35", "#49524c", "#5f6d64", "#7c8a80", "#98a49c", "#b5bfb8", "#d4dbd6"] }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "The lobby heading only." },
-      "title": { "displayName": "Title", "purpose": "Seat names, the status line, lobby table names." },
-      "clock": { "displayName": "Clock", "purpose": "Seat clocks, tabular numerals." }
+      "display": { "displayName": "Display", "purpose": "Lobby heading (Hahmlet)." },
+      "result": { "displayName": "Result", "purpose": "승리 / 패배 / 무승부 on the title band (Hahmlet)." },
+      "clock": { "displayName": "Clock", "purpose": "Seat clocks, tabular (Hahmlet)." },
+      "headline": { "displayName": "Headline", "purpose": "Room titles, lobby room names, dialog titles (Hahmlet)." },
+      "title": { "displayName": "Title", "purpose": "Seat names and the status line (Pretendard)." }
     },
     "shadows": [
-      { "name": "table", "value": "inset 0 1px 0 rgb(255 255 255 / 9%), 0 2px 3px rgb(28 33 31 / 18%), 0 22px 40px -18px rgb(28 33 31 / 55%)", "purpose": "The granite table." },
-      { "name": "plaque", "value": "0 2px 4px rgb(28 33 31 / 16%), 0 30px 56px -18px rgb(28 33 31 / 60%)", "purpose": "Result plaque on the board." },
-      { "name": "dialog", "value": "0 32px 64px -24px rgb(28 33 31 / 60%)", "purpose": "Modal dialogs." },
-      { "name": "lifted-piece", "value": "drop-shadow(0 8px 6px rgb(28 33 31 / 35%))", "purpose": "A dragged piece (filter)." }
+      { "name": "clock", "value": "0 6px 14px -6px rgb(0 0 0 / 60%)", "purpose": "The running clock." },
+      { "name": "dialog", "value": "inset 0 0 0 1px rgb(232 224 204 / 24%), 0 40px 80px -24px rgb(0 0 0 / 80%)", "purpose": "Dialogs." }
     ],
     "motion": [
-      { "name": "ease-out", "value": "cubic-bezier(0.2, 0.8, 0.25, 1)", "purpose": "Every authored motion." },
-      { "name": "piece-slide", "value": "190ms", "purpose": "A move sliding into place." },
-      { "name": "seat-settle", "value": "260ms", "purpose": "Someone sitting down or standing up." },
-      { "name": "plaque", "value": "280ms", "purpose": "Result plaque appearing." }
+      { "name": "ease-out", "value": "cubic-bezier(0.2, 0.8, 0.25, 1)", "purpose": "UI motion." },
+      { "name": "arrival", "value": "1.5s", "purpose": "Camera from the park down to the chair." },
+      { "name": "flip", "value": "1.1s", "purpose": "Camera orbit when the board is turned." },
+      { "name": "move", "value": "0.26–0.52s", "purpose": "A piece thrown onto its square." },
+      { "name": "capture-freeze", "value": "60–160ms", "purpose": "Hit-stop, scaled by the value taken." },
+      { "name": "mate", "value": "0.4× for ~1.2s", "purpose": "Slow motion while the king topples." },
+      { "name": "result", "value": "0.38s band + 0.5s slam, after 1.75s (mate) / 0.9s (resign, time) / 0.2s", "purpose": "The result title band." }
     ],
     "breakpoints": [
       { "name": "phone", "value": "600px" },
-      { "name": "narrow", "value": "720px" },
       { "name": "single-column", "value": "900px" },
       { "name": "compact-side", "value": "1180px" }
     ]
@@ -42,9 +42,9 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The one action to take now: 참가, 방 만들기, 한 판 더.",
+      "description": "The one action to take now: 방 만들기, 참가, 한 판 더.",
       "html": "<button class=\"ds-btn-primary\">참가</button>",
-      "css": ".ds-btn-primary { min-height: 38px; padding: 0 14px; border: 1px solid #2f5a45; border-radius: 8px; background: #2f5a45; color: #f4f1ea; font: 600 14.5px/1 'Pretendard Variable', Pretendard, system-ui, sans-serif; cursor: pointer; transition: background-color .12s, transform .12s cubic-bezier(0.2,0.8,0.25,1); } .ds-btn-primary:hover { background: #234535; border-color: #234535; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid #2f5a45; outline-offset: 2px; }"
+      "css": ".ds-btn-primary { min-height: 40px; padding: 0 15px; border: 1px solid #f5c77e; border-radius: 4px; background: #f5c77e; color: #22190b; font: 700 14.5px/1 'Pretendard Variable', Pretendard, system-ui, sans-serif; cursor: pointer; transition: background-color .14s, transform .14s cubic-bezier(0.2,0.8,0.25,1); } .ds-btn-primary:hover { background: #ffd999; border-color: #ffd999; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid #f5c77e; outline-offset: 2px; }"
     },
     {
       "name": "Button",
@@ -52,7 +52,7 @@
       "refersTo": "button",
       "description": "Secondary actions such as 무승부 제안, 기권, 닫기.",
       "html": "<button class=\"ds-btn\">닫기</button>",
-      "css": ".ds-btn { min-height: 38px; padding: 0 14px; border: 1px solid #9da199; border-radius: 8px; background: #e8e9e5; color: #1c211f; font: 600 14.5px/1 'Pretendard Variable', Pretendard, system-ui, sans-serif; cursor: pointer; transition: background-color .12s, border-color .12s; } .ds-btn:hover { background: #f4f5f2; border-color: #5a615d; } .ds-btn:focus-visible { outline: 2px solid #2f5a45; outline-offset: 2px; }"
+      "css": ".ds-btn { min-height: 40px; padding: 0 15px; border: 1px solid rgb(232 224 204 / 24%); border-radius: 4px; background: transparent; color: #ede6d6; font: 600 14.5px/1 'Pretendard Variable', Pretendard, system-ui, sans-serif; cursor: pointer; transition: background-color .14s, border-color .14s; } .ds-btn:hover { background: rgb(232 224 204 / 6%); border-color: rgb(232 224 204 / 42%); } .ds-btn:focus-visible { outline: 2px solid #f5c77e; outline-offset: 2px; }"
     },
     {
       "name": "Text Input",
@@ -60,52 +60,51 @@
       "refersTo": "input",
       "description": "Room name, chat, player name.",
       "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"방 이름 (선택)\">",
-      "css": ".ds-input { height: 42px; padding: 0 12px; border: 1px solid #9da199; border-radius: 8px; background: #f4f5f2; color: #1c211f; font: 16px 'Pretendard Variable', Pretendard, system-ui, sans-serif; caret-color: #2f5a45; } .ds-input::placeholder { color: #5a615d; } .ds-input:focus-visible { outline: 2px solid #2f5a45; border-color: #2f5a45; }"
+      "css": ".ds-input { height: 44px; padding: 0 14px; border: 1px solid rgb(232 224 204 / 24%); border-radius: 4px; background: #0a0f0d; color: #ede6d6; font: 16px 'Pretendard Variable', Pretendard, system-ui, sans-serif; caret-color: #f5c77e; } .ds-input::placeholder { color: #918b7e; } .ds-input:focus-visible { outline: 1px solid #f5c77e; border-color: #f5c77e; }"
     },
     {
       "name": "Seat Strip",
       "kind": "custom",
-      "description": "A player's place at the table edge with name, taken pieces and clock; green clock while running.",
+      "description": "A player's place at the table edge with name, taken pieces and clock; the running clock stands in the sun.",
       "html": "<div class=\"ds-seat\"><span class=\"ds-puck\"></span><span class=\"ds-who\"><b>Alice</b><small>나 · 백</small></span><span class=\"ds-lead\">+3</span><span class=\"ds-clock\">14:52</span></div>",
-      "css": ".ds-seat { display: flex; align-items: center; gap: 10px; height: 52px; width: 420px; font-family: 'Pretendard Variable', Pretendard, system-ui, sans-serif; color: #1c211f; } .ds-puck { width: 22px; height: 22px; border: 1.5px solid #1c211f; border-radius: 50%; background: #f6f2e9; } .ds-who { display: flex; flex-direction: column; line-height: 1.25; } .ds-who b { font-size: 16px; font-weight: 650; } .ds-who small { font-size: 12.5px; color: #454c48; } .ds-lead { flex: 1; font-size: 13px; font-weight: 650; color: #454c48; } .ds-clock { padding: 7px 12px; border-radius: 8px; background: #2f5a45; color: #f4f1ea; font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1; }"
+      "css": ".ds-seat { display: flex; align-items: center; gap: 12px; height: 56px; width: 460px; padding: 0 12px; background: #101714; font-family: 'Pretendard Variable', Pretendard, system-ui, sans-serif; color: #ede6d6; } .ds-puck { width: 20px; height: 20px; border-radius: 50%; background: #efe7d8; } .ds-who { display: flex; flex-direction: column; line-height: 1.25; } .ds-who b { font-size: 17px; font-weight: 650; } .ds-who small { font-size: 12.5px; color: #b9b1a0; } .ds-lead { flex: 1; font-size: 13.5px; font-weight: 700; color: #f5c77e; } .ds-clock { padding: 8px 14px 7px; border-radius: 4px; background: #f5c77e; color: #22190b; font: 600 30px/1 'Hahmlet Variable', serif; font-variant-numeric: tabular-nums; }"
     },
     {
-      "name": "Lobby Table",
-      "kind": "card",
-      "description": "A room in the lobby drawn as a table from above with its two seats.",
-      "html": "<button class=\"ds-table\"><span class=\"ds-mini\"><span class=\"ds-pill\">Alice</span><span class=\"ds-board\"></span><span class=\"ds-pill ds-empty\">빈 자리</span></span><span class=\"ds-name\">금요일 저녁 한 판</span><span class=\"ds-status\">대기 중 (1/2)</span></button>",
-      "css": ".ds-table { display: flex; flex-direction: column; gap: 10px; width: 240px; padding: 12px 12px 14px; border: 1px solid #bfc3bb; border-radius: 14px; background: #e8e9e5; font-family: 'Pretendard Variable', Pretendard, system-ui, sans-serif; text-align: left; cursor: pointer; transition: box-shadow .2s, transform .2s cubic-bezier(0.2,0.8,0.25,1); } .ds-table:hover { box-shadow: 0 14px 28px -18px rgb(28 33 31 / 55%); transform: translateY(-2px); } .ds-mini { display: grid; justify-items: center; gap: 8px; padding: 14px 8px; border-radius: 9px; background: #d5d7d2; } .ds-board { width: 92px; aspect-ratio: 1; border: 6px solid #2c312e; border-radius: 6px; background: repeating-conic-gradient(#7c8a80 0 25%, #e6decb 0 50%) 0 0 / 25% 25%; } .ds-pill { padding: 2px 10px; border-radius: 999px; background: #e8e9e5; font-size: 12.5px; font-weight: 650; } .ds-empty { border: 1px dashed #9da199; background: transparent; font-weight: 500; color: #454c48; } .ds-name { font-size: 16px; font-weight: 700; color: #1c211f; } .ds-status { font-size: 13px; font-weight: 600; color: #454c48; }"
+      "name": "Lobby Table Row",
+      "kind": "list-item",
+      "description": "A room in the lobby: a mini board between two seat marks, the name in Hahmlet, status and players.",
+      "html": "<button class=\"ds-row\"><span class=\"ds-mini\"></span><span class=\"ds-text\"><b>금요일 저녁 한 판</b><small>대기 중 (1/2) · Alice</small></span></button>",
+      "css": ".ds-row { display: flex; align-items: center; gap: 18px; width: 420px; padding: 16px 4px; border: 0; border-bottom: 1px solid rgb(232 224 204 / 11%); background: #101714; color: #ede6d6; text-align: left; cursor: pointer; } .ds-mini { width: 44px; height: 44px; padding: 3px; border-radius: 3px; background: #26292a content-box repeating-conic-gradient(#5f6d64 0 25%, #e2d6bd 0 50%) 0 0 / 25% 25%; box-shadow: 0 0 0 1px rgb(232 224 204 / 24%); } .ds-text { display: grid; gap: 3px; } .ds-text b { font: 650 20px/1.25 'Hahmlet Variable', serif; } .ds-text small { font: 13.5px 'Pretendard Variable', Pretendard, system-ui, sans-serif; color: #b9b1a0; }"
     }
   ],
   "narrative": {
-    "northStar": "The Park Stone Table",
-    "overview": "The room is a stone chess table in a city park. Two players sit at its top and bottom edges; spectators stand around it and talk. The page ground is pale granite paving, the board is an inlay of warm travertine and cool slate framed by a dark polished granite rim, and the coordinates are engraved on that rim. Everything else is flat, quiet stone so the board and the clocks carry the screen.",
+    "northStar": "The Park Table at Golden Hour",
+    "overview": "A real stone chess table in a park, drawn live in 3D: low sun through a canopy over a polished granite slab with an inlaid travertine and slate board and carved alabaster and basalt pieces. The UI is the shade around it; sunlight is the only accent, and every move lands with the weight of stone.",
     "keyCharacteristics": [
-      "A dark granite table with an inlaid board is the only heavy object on the page.",
-      "Seats, not panels: each player is a strip on their edge of the table with name, taken pieces and clock.",
-      "Colour means \"active\": the running clock, the latest move, the primary action, the selection.",
-      "The square size is the layout module; board, rim and columns derive from it.",
-      "Newly drawn carved-stone piece silhouettes (SVG, 45x45 viewBox)."
+      "The 3D table is the only lit object; the UI is flat shade with hairlines.",
+      "Sunlight means active, in the UI and in the scene.",
+      "Impact escalates: move, capture (hit-stop, knock-off), check (shudder), mate (slow-motion topple).",
+      "A transparent DOM board over the 3D board keeps input, focus and accessibility; WebGL-less browsers get the same grid as a 2D board.",
+      "Hahmlet for stone-cut type (titles, results, clocks), Pretendard for the rest."
     ],
     "rules": [
-      { "name": "The Active Edge Rule", "body": "Green marks only what is active at this moment. A decorative green element makes the running clock harder to find.", "section": "colors" },
-      { "name": "The One Rule Per State Rule", "body": "On the board, ::before tints a square (last move, selection, check) and ::after marks a destination (dot for a move, ring for a capture). No state borrows another's mark.", "section": "colors" },
+      { "name": "The Light Means Active Rule", "body": "Sunlight marks only what is active now: the running clock, the primary action, the selection, the targets, the latest move.", "section": "colors" },
+      { "name": "The Shade Rule", "body": "UI surfaces are flat shade with hairlines; no colored glows, glass or decorative gradients.", "section": "colors" },
       { "name": "The Keep-All Rule", "body": "Korean text uses word-break: keep-all so words never split across lines.", "section": "typography" },
-      { "name": "The Heavy Object Rule", "body": "Only the table, the plaque, dialogs and a lifted piece cast shadows. Panels separate with hairlines, not shadows.", "section": "elevation" }
+      { "name": "The Escalation Rule", "body": "Effects scale with the event; a quiet move never shakes like a capture.", "section": "motion" }
     ],
     "dos": [
-      "Do derive board, rim and column sizes from --square.",
-      "Do keep green for the active thing: running clock, latest move, primary action, selection.",
-      "Do keep text on Plaza at Ink Secondary or darker; Ink Tertiary only on Slab or lighter.",
-      "Do give every new board state its own mark on ::before (tint) or ::after (destination)."
+      "Do keep sunlight for the active thing.",
+      "Do act out every board change; snap when it is not one move.",
+      "Do keep every control in the DOM.",
+      "Do scale impact with the event."
     ],
     "donts": [
-      "Don't add shadows to panels, lists or buttons; they belong to heavy objects only.",
-      "Don't use the granite fleck texture anywhere but the table and mini tables.",
-      "Don't use a browser confirm() or alert(); use the confirm bar.",
-      "Don't put green on permanent chrome; the brand mark is granite.",
-      "Don't wrap a lobby table in a card; it stands on the plaza.",
-      "Don't introduce a second typeface or a dark theme without a new direction decision."
+      "Don't put colored glows, glass or gradients on UI surfaces.",
+      "Don't imitate materials in CSS; material lives in the scene.",
+      "Don't use cards, pills or radii above 6px.",
+      "Don't let the scene cover the status, the clocks or a primary action.",
+      "Don't use a browser confirm() or alert(); use the confirm bar."
     ]
   }
 }

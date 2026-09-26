@@ -1,5 +1,13 @@
+import '@fontsource-variable/hahmlet/wght.css';
 import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
-import { squareName, type Color, type PromotionPiece, type Square } from '../shared/chess/index.ts';
+import {
+  initialPosition,
+  squareName,
+  type Color,
+  type PieceType,
+  type PromotionPiece,
+  type Square,
+} from '../shared/chess/index.ts';
 import type { CreateRoomResult, LobbySnapshot, RoomSnapshot } from '../shared/protocol.ts';
 import { BoardView, pieceImage } from './board-view.ts';
 import { ChatView } from './chat-view.ts';
@@ -11,7 +19,8 @@ import {
   saveToken,
   type RequestResult,
 } from './connection.ts';
-import { playSound } from './sounds.ts';
+import type { SceneModel, TableStage } from './scene/stage.ts';
+import * as sfx from './sfx.ts';
 import { COLOR_NAME, ERROR_TEXT, PIECE_NAME } from './text.ts';
 import {
   buildView,
@@ -76,7 +85,11 @@ const dom = {
   backToLobby: element('back-to-lobby', HTMLButtonElement),
   copyLink: element('copy-link', HTMLButtonElement),
   copyLinkLabel: element('copy-link-label', HTMLElement),
+  sound: element('sound', HTMLButtonElement),
+  soundIcon: document.getElementById('sound-icon'),
+  lobbyScene: element('lobby-scene', HTMLElement),
   roomView: element('room-view', HTMLElement),
+  scene: element('scene', HTMLElement),
   seatTop: seatElements('seat-top'),
   seatBottom: seatElements('seat-bottom'),
   board: element('board', HTMLElement),
@@ -174,6 +187,54 @@ const board = new BoardView(
   },
   { ranks: dom.rimRanks, files: dom.rimFiles },
 );
+
+/** The 3D table; null until it has loaded, or for good where WebGL is missing. */
+let stage: TableStage | null = null;
+// three.js loads after the page is usable; until it is, the board waits hidden.
+void import('./scene/stage.ts')
+  .then(({ createStage }) => createStage())
+  .catch(() => null)
+  .then((created) => {
+    stage = created;
+    document.body.dataset.scene = created ? '3d' : '2d';
+    board.setPresenter(created);
+    render();
+  });
+
+/** The lobby's table: a set standing ready, nobody playing. */
+const LOBBY_SCENE: SceneModel = {
+  board: {
+    board: initialPosition().board,
+    ply: 0,
+    orientation: 'w',
+    lastMove: null,
+    check: null,
+    selected: null,
+    targets: new Set(),
+    movable: new Set(),
+  },
+  gameId: null,
+  status: 'none',
+  outcome: null,
+  captured: { w: [], b: [] },
+  me: null,
+  pending: false,
+  resultTone: null,
+};
+
+function sceneModel(): SceneModel {
+  const game = state.room?.game ?? null;
+  return {
+    board: view.board,
+    gameId: game?.id ?? null,
+    status: game?.status ?? 'none',
+    outcome: game?.outcome ?? null,
+    captured: view.captured,
+    me: colorOf(game, state.session?.playerId),
+    pending: state.pending,
+    resultTone: view.result?.tone ?? null,
+  };
+}
 
 function update(patch: Partial<ClientState>): void {
   state = { ...state, ...patch };
@@ -321,7 +382,8 @@ async function tryMove(from: Square, to: Square): Promise<void> {
     if (!promotion) return;
   }
   update({ pending: true, selected: null });
-  playSound('move');
+  if (stage) stage.playLocal(from, to, promotion);
+  else sfx.placeSound(first.piece);
   const result = await request(socket, 'game:move', {
     from: squareName(from),
     to: squareName(to),
@@ -429,6 +491,19 @@ dom.copyLink.addEventListener('click', () => {
     },
   );
 });
+
+function renderSound(): void {
+  const on = sfx.soundEnabled();
+  dom.sound.setAttribute('aria-pressed', String(on));
+  dom.sound.title = on ? '효과음 끄기' : '효과음 켜기';
+  dom.soundIcon?.setAttribute('href', on ? '#i-sound' : '#i-mute');
+}
+dom.sound.addEventListener('click', () => {
+  sfx.setSoundEnabled(!sfx.soundEnabled());
+  renderSound();
+  if (sfx.soundEnabled()) sfx.placeSound('n', 0.2);
+});
+renderSound();
 
 dom.seatTake.addEventListener('click', () => {
   send('seat:take');
@@ -538,6 +613,11 @@ function render(): void {
   dom.lobbyView.hidden = inRoom;
   dom.roomView.hidden = !inRoom;
   dom.roomBar.hidden = !inRoom;
+  dom.copyLink.hidden = !inRoom;
+  if (stage) {
+    if (inRoom) stage.mount(dom.scene, 'room', dom.board);
+    else stage.mount(dom.lobbyScene, 'lobby', null);
+  }
   dom.myName.textContent = state.session?.name ?? '';
   dom.rename.hidden = !state.session;
   if (inRoom) renderRoom();
@@ -553,9 +633,10 @@ function renderLobby(): void {
   dom.lobbyEmpty.hidden = !lobby || rows.length > 0;
   dom.roomCount.textContent = rows.length ? `${String(rows.length)}개` : '';
   dom.roomList.replaceChildren(...rows.map(lobbyTable));
+  stage?.sync(LOBBY_SCENE);
 }
 
-/** A room in the lobby, drawn as a table seen from above with its two seats. */
+/** A room in the lobby: a small table seen from above, its name, who sits there. */
 function lobbyTable(row: LobbyRow): HTMLElement {
   const item = document.createElement('li');
   const button = document.createElement('button');
@@ -563,11 +644,11 @@ function lobbyTable(row: LobbyRow): HTMLElement {
   button.className = `room-item${row.playing ? ' playing' : ''}`;
   button.dataset.room = row.id;
 
-  const top = document.createElement('span');
-  top.className = 'mini-table';
-  top.setAttribute('aria-hidden', 'true');
+  const mini = document.createElement('span');
+  mini.className = 'mini-table';
+  mini.setAttribute('aria-hidden', 'true');
   const [far, near] = row.seats;
-  top.append(miniSeat(far), miniBoard(), miniSeat(near));
+  mini.append(miniSeat(far), miniBoard(), miniSeat(near));
 
   const name = document.createElement('span');
   name.className = 'room-item-name';
@@ -578,20 +659,29 @@ function lobbyTable(row: LobbyRow): HTMLElement {
   const players = document.createElement('span');
   players.className = 'room-item-players';
   const seated = row.seats.filter((seat): seat is string => seat !== null);
-  players.textContent = seated.length ? seated.join(row.playing ? ' vs ' : ', ') : '빈 테이블';
+  players.textContent = seated.length ? seated.join(row.playing ? ' 대 ' : ', ') : '빈 테이블';
+  const meta = document.createElement('span');
+  meta.className = 'room-item-meta';
+  meta.append(status, players);
   const text = document.createElement('span');
   text.className = 'room-item-text';
-  text.append(name, status, players);
+  text.append(name, meta);
 
-  button.append(top, text);
+  const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  arrow.setAttribute('class', 'icon room-item-go');
+  arrow.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+  use.setAttribute('href', '#i-arrow');
+  arrow.append(use);
+
+  button.append(mini, text, arrow);
   item.append(button);
   return item;
 }
 
 function miniSeat(name: string | null): HTMLElement {
   const seat = document.createElement('span');
-  seat.className = name ? 'mini-seat' : 'mini-seat empty';
-  seat.textContent = name ?? '빈 자리';
+  seat.className = name ? 'mini-seat taken' : 'mini-seat';
   return seat;
 }
 
@@ -608,6 +698,7 @@ function renderRoom(): void {
   document.title = room ? `${room.name} - Chess` : 'Chess';
 
   board.render(view.board);
+  stage?.sync(sceneModel());
   // Moves played so far; lets automated tests wait for the server's answer.
   dom.board.dataset.ply = String(room?.game?.moves.length ?? 0);
   dom.board.dataset.status = room?.game?.status ?? 'none';
@@ -670,6 +761,7 @@ function renderRoom(): void {
     dom.resultTitle.textContent = result.title;
     dom.resultReason.textContent = result.reason;
     dom.result.dataset.tone = result.tone;
+    dom.result.dataset.reason = room?.game?.outcome?.reason ?? '';
   }
   // The join button sits on the free seat, or on the result plaque while it is shown,
   // so there is only ever one of it.
@@ -816,11 +908,15 @@ function renderClock(): void {
     node.classList.toggle('low', left <= CLOCK_WARNING_MS);
     node.setAttribute('aria-label', `${COLOR_NAME[color]} 남은 시간 ${text}`);
 
-    // Warn once per game when the player's own time gets low.
-    const key = `${String(game?.id)}:${color}`;
-    if (running && left <= CLOCK_WARNING_MS && view.myColor === color && clockWarnedFor !== key) {
-      clockWarnedFor = key;
-      playSound('clockWarning');
+    // The player's own clock: a tick at 30 seconds, then every second of the last ten.
+    if (running && view.myColor === color && left > 0) {
+      const second = Math.ceil(left / 1000);
+      const key = `${String(game?.id)}:${color}:${String(second)}`;
+      const due = second === CLOCK_WARNING_MS / 1000 || second <= 10;
+      if (due && left <= CLOCK_WARNING_MS && clockWarnedFor !== key) {
+        clockWarnedFor = key;
+        sfx.tickSound();
+      }
     }
   }
 }
@@ -848,30 +944,36 @@ setInterval(() => {
 
 // ------------------------------------------------------------------ sounds
 
-/** Sound effects of the original game, triggered by snapshot changes. */
+/**
+ * Sounds of what happens in the room. The 3D table voices the moves itself,
+ * in time with what it shows; without it they play here.
+ */
 function playSounds(previous: RoomSnapshot | null, next: RoomSnapshot): void {
   // The first snapshot after entering a room is not an event to announce.
   if (!previous) return;
   const before = previous.game;
   const after = next.game;
+  if (next.seats.length > previous.seats.length && !after) sfx.chimeSound();
   if (!after) return;
-  const me = state.session?.playerId;
-  const myColor = colorOf(after, me);
+  if (after.drawOffer && after.drawOffer !== before?.drawOffer) sfx.chimeSound();
+  if (stage) return;
   if (after.id !== before?.id) {
-    if (after.status === 'playing') playSound('gameStart');
-    return;
-  }
-  if (after.status === 'finished' && before.status === 'playing') {
-    playSound(myColor && after.outcome?.winner === myColor ? 'victory' : 'defeatOrDraw');
+    if (after.status === 'playing') sfx.setupSound(16, 0.6);
     return;
   }
   if (after.moves.length > before.moves.length) {
     const last = after.moves.at(-1);
-    if (!last || last.color === myColor) return; // own move already made a sound
-    if (!myColor) playSound('move');
-    else playSound(last.san.endsWith('+') ? 'check' : 'yourTurn');
-  } else if (after.drawOffer && after.drawOffer !== before.drawOffer) {
-    playSound('gameStart');
+    if (last) {
+      const mover = last.san.charAt(0);
+      const piece: PieceType = 'NBRQK'.includes(mover) ? (mover.toLowerCase() as PieceType) : 'p';
+      if (last.san.endsWith('#')) sfx.mateSound();
+      else if (last.captured) sfx.captureSound(3);
+      else if (last.color !== colorOf(after, state.session?.playerId)) sfx.placeSound(piece);
+      if (last.san.endsWith('+')) sfx.checkSound();
+    }
+  }
+  if (after.status === 'finished' && before.status === 'playing' && view.result) {
+    sfx.endSound(view.result.tone);
   }
 }
 
