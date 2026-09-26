@@ -1,6 +1,6 @@
 # Chess
 
-브라우저에서 두 사람이 1대1로 두는 체스 웹 애플리케이션입니다.
+브라우저에서 두 사람이 1대1로 두는 체스 웹 애플리케이션입니다. **<https://chess-refactored.vercel.app>**
 [`seuha516/chess-js`](https://github.com/seuha516/chess-js)를 출발점으로 삼아 전체를 다시 다듬은 프로젝트이며,
 첫 커밋에 원본 소스가 그대로 보존되어 있습니다.
 
@@ -31,7 +31,12 @@ npm run build      # 클라이언트를 dist/client로 빌드
 npm start          # http://localhost:3000
 ```
 
-인증서나 HTTPS 설정은 필요하지 않습니다. 운영 배포 환경(도메인, TLS, 리버스 프록시)은 이 프로젝트의 범위가 아닙니다.
+인증서나 HTTPS 설정은 필요하지 않습니다.
+
+### Vercel 배포
+
+`main` 브랜치에 push하면 Vercel에 자동으로 배포됩니다(프론트엔드와 서버가 한 프로젝트, 상태는 Upstash Redis).
+구성, 설정, 무료 한도와 주의점은 [docs/deployment.md](docs/deployment.md)를 참고하세요.
 
 ### 환경 변수
 
@@ -49,6 +54,7 @@ npm start          # http://localhost:3000
 | ---------------------- | ---------------------------------------------------------- |
 | `npm run dev`          | 개발 서버(HMR)                                             |
 | `npm run build`        | 클라이언트 프로덕션 빌드                                   |
+| `npm run vercel-build` | Vercel 배포용 빌드(.vercel/output)                         |
 | `npm start`            | 빌드된 클라이언트와 게임 서버 실행                         |
 | `npm test`             | 단위·통합 테스트(Vitest)                                   |
 | `npm run test:e2e`     | 브라우저 E2E 테스트(Playwright, 설치된 Google Chrome 사용) |
@@ -74,9 +80,10 @@ docs/              설계 문서
 
 - [docs/architecture.md](docs/architecture.md): 서버 권한 구조, 프로토콜, 세션·재접속, 시간 처리, 보안
 - [docs/rules.md](docs/rules.md): 적용한 규정과 조항, 원본 규칙 구현의 결함과 수정, 검증 방법, 알려진 한계
+- [docs/deployment.md](docs/deployment.md): Vercel 배포 구성, 설정, 비용과 한도
 
 ## 기술 스택
 
-TypeScript 6 · Node.js(타입 스트리핑으로 직접 실행) · Express 5 · Socket.IO 4 · Vite 8 ·
+TypeScript 6 · Node.js(타입 스트리핑으로 직접 실행) · Express 5 · Socket.IO 4 · Redis(ioredis, Upstash) · Vite 8 ·
 Vitest 5 · Playwright · ESLint(typescript-eslint) · Prettier.
 [chess.js](https://github.com/jhlywa/chess.js)는 규칙 엔진 교차 검증용 개발 의존성으로만 사용합니다.

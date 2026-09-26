@@ -20,9 +20,16 @@ function redisOptions(): GameServerOptions {
     return {};
   }
   const redis = new Redis(redisUrl, { maxRetriesPerRequest: 3 });
+  // Production and preview deployments share the database; keep their rooms
+  // and broadcasts apart.
+  const environment = process.env.VERCEL_ENV ?? 'development';
   return {
-    store: new RedisStore(redis),
-    socket: { adapter: createAdapter(redis.duplicate(), redis.duplicate()) },
+    store: new RedisStore(redis, `chess:${environment}:`),
+    socket: {
+      adapter: createAdapter(redis.duplicate(), redis.duplicate(), {
+        key: `socket.io:${environment}`,
+      }),
+    },
   };
 }
 

@@ -16,10 +16,7 @@ afterEach(async () => {
 
 const implementations: [string, () => Store][] = [
   ['MemoryStore', () => new MemoryStore()],
-  [
-    'RedisStore',
-    () => new RedisStore(new RedisMock(), `test${String(prefixCounter++)}:`),
-  ],
+  ['RedisStore', () => new RedisStore(new RedisMock(), `test${String(prefixCounter++)}:`)],
 ];
 
 describe.each(implementations)('%s', (_name, make) => {
