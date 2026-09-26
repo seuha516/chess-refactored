@@ -55,6 +55,8 @@ await writeFile(
       shouldAddSourcemapSupport: true,
       // Hobby maximum; clients reconnect when the function closes the socket.
       maxDuration: 300,
+      // Tokyo, next to the Upstash Redis database (and close to players in Korea).
+      regions: ['hnd1'],
     },
     null,
     2,
