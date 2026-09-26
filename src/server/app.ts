@@ -16,6 +16,7 @@ import { MemoryStore, type Store } from './store.ts';
 import {
   isAck,
   parseChatText,
+  parseMascotTug,
   parseMoveRequest,
   parseName,
   parseRoomId,
@@ -312,5 +313,22 @@ function bindEvents(socket: ClientSocket, service: ChessService, limiter: RateLi
       return;
     }
     reply(await service.act(socket.id, (room, player, ctx) => logic.chat(room, player, text, ctx)));
+  });
+  // Nothing is stored: the pull is passed on to the rest of the room as it
+  // is, marked with the puller's public id (clients show only a player's own
+  // pebble moving). Dropped rather than queued when a client is behind.
+  on('mascot:tug', parseMascotTug, (tug, reply) => {
+    const roomId = service.roomOf(socket.id);
+    if (!roomId) {
+      reply({ ok: false, error: 'not-in-room' });
+      return Promise.resolve();
+    }
+    if (!service.allow(`mascot:${session().id}`, 12, 1000)) {
+      reply({ ok: false, error: 'rate-limited' });
+      return Promise.resolve();
+    }
+    socket.to(roomChannel(roomId)).volatile.emit('mascot', { ...tug, playerId: session().id });
+    reply({ ok: true });
+    return Promise.resolve();
   });
 }

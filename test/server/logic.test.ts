@@ -60,7 +60,7 @@ describe('seats and game start', () => {
       moves: [],
       outcome: null,
     });
-    expect(room.chat.at(-1)?.text).toBe('Alice(백)와 Bob(흑)의 대결을 시작합니다.');
+    expect(room.chat.at(-1)?.text).toBe('대국 시작 · 백 Alice, 흑 Bob');
     let other = logic.createRoom('r2', 'Other', T0);
     other = expectOk(logic.takeSeat(other, alice, { ...ctx(), random: () => 0.75 }));
     other = expectOk(logic.takeSeat(other, bob, { ...ctx(), random: () => 0.75 }));
@@ -119,7 +119,7 @@ describe('moves', () => {
     });
     expect(room.game?.outcome).toEqual({ winner: 'b', reason: 'checkmate' });
     expect(room.game?.clock.running).toBeNull();
-    expect(room.chat.at(-1)?.text).toBe('체크메이트에 의해 Bob의 승리로 경기를 종료합니다.');
+    expect(room.chat.at(-1)?.text).toBe('체크메이트로 Bob 승리');
     expect(logic.takeSeat(room, alice, ctx()).ok).toBe(true);
   });
 
@@ -174,7 +174,7 @@ describe('disconnection (FIDE Online Regulations 11.4.2)', () => {
     expect(logic.resolve(room, presence, T0 + 10_000 + DISCONNECT_FORFEIT_MS - 1)).toBe(room);
     const resolved = logic.resolve(room, presence, T0 + 10_000 + DISCONNECT_FORFEIT_MS);
     expect(resolved.game?.outcome).toEqual({ winner: 'b', reason: 'disconnection' });
-    expect(resolved.chat.at(-1)?.text).toBe('연결 끊김에 의해 Bob의 승리로 경기를 종료합니다.');
+    expect(resolved.chat.at(-1)?.text).toBe('연결 끊김으로 Bob 승리');
   });
 
   it('treats a connection that stopped sending heartbeats as gone (crashed instance)', () => {
@@ -242,7 +242,7 @@ describe('resignation, draw offers and chat', () => {
     room = expectOk(logic.offerDraw(room, alice, ctx()));
     room = expectOk(logic.move(room, bob, mv('e7e5', 1), ctx()));
     expect(room.game?.drawOffer).toBeNull();
-    expect(room.chat.at(-1)?.text).toBe('무승부 제안이 거절되었습니다.');
+    expect(room.chat.at(-1)?.text).toBe('무승부 제안이 거절됐어요.');
     room = expectOk(logic.offerDraw(room, alice, ctx()));
     room = expectOk(logic.offerDraw(room, bob, ctx()));
     expect(room.game?.outcome).toEqual({ winner: null, reason: 'agreement' });
@@ -258,7 +258,7 @@ describe('resignation, draw offers and chat', () => {
   it('announces players entering, but not reconnects', () => {
     const room = logic.createRoom('r1', 'Test', T0);
     expect(logic.announceJoin(room, carol, EMPTY_PRESENCE, T0)?.chat.at(-1)?.text).toBe(
-      'Carol님이 입장하였습니다.',
+      'Carol님이 들어왔어요.',
     );
     expect(logic.announceJoin(room, carol, present('carol'), T0)).toBeNull();
     expect(
@@ -275,11 +275,13 @@ describe('lobby summary', () => {
       name: 'Test',
       status: 'waiting',
       players: ['Alice'],
+      playerIds: ['alice'],
       createdAt: T0,
     });
     expect(logic.toSummary(started())).toMatchObject({
       status: 'playing',
       players: ['Alice', 'Bob'],
+      playerIds: ['alice', 'bob'],
     });
   });
 });

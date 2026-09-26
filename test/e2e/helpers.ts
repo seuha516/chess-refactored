@@ -14,18 +14,19 @@ export async function join(
   await page.goto('/');
   await expect(page.locator('#name-dialog')).toBeVisible();
   await page.fill('#name-input', name);
-  await page.click('#name-dialog button[value=ok]');
+  // Enter confirms the name (it used to press the cancel button).
+  await page.press('#name-input', 'Enter');
   await expect(page.locator('#my-name')).toHaveText(name);
   return page;
 }
 
-/** Creates a room from the lobby and returns its invitation URL. */
+/** Creates a room from the lobby (its creator sits down) and returns its invitation URL. */
 export async function openRoom(page: Page, name = 'E2E 방'): Promise<string> {
   await page.fill('#room-name', name);
   await page.click('#create-room button[type=submit]');
   await expect(page).toHaveURL(/[?]room=/);
   await expect(page.locator('#room-title')).toHaveText(name);
-  await expect(page.locator('#seat-take')).toBeVisible();
+  await expect(page.locator('#seat-leave')).toBeVisible();
   return page.url();
 }
 
@@ -45,12 +46,10 @@ export const square = (page: Page, name: string) => page.locator(`.square[aria-l
 export async function startGame(a: Page, b: Page, ...spectators: Page[]): Promise<[Page, Page]> {
   const url = await openRoom(a);
   for (const page of [b, ...spectators]) await enterRoom(page, url);
-  await a.click('#seat-take');
-  await expect(a.locator('#seat-leave')).toBeVisible();
   await b.click('#seat-take');
   await expect(a.locator('#board')).toHaveAttribute('data-status', 'playing');
   await expect(b.locator('#board')).toHaveAttribute('data-status', 'playing');
-  const aIsWhite = (await a.locator('#status').textContent())?.includes('당신의 차례') ?? false;
+  const aIsWhite = (await a.locator('#status').textContent())?.includes('내 차례') ?? false;
   return aIsWhite ? [a, b] : [b, a];
 }
 
@@ -66,7 +65,7 @@ export async function move(page: Page, uci: string): Promise<void> {
 export async function playMoves(white: Page, black: Page, moves: string[]): Promise<void> {
   for (const [index, uci] of moves.entries()) {
     const page = index % 2 === 0 ? white : black;
-    await expect(page.locator('#status')).toContainText('당신의 차례');
+    await expect(page.locator('#status')).toContainText('내 차례');
     await move(page, uci);
   }
 }
@@ -90,6 +89,10 @@ export async function nameOf(page: Page): Promise<string> {
  */
 export async function cleanUp(): Promise<void> {
   for (const page of openPages.splice(0)) {
+    if (page.isClosed()) {
+      await page.context().close();
+      continue;
+    }
     // Buttons may disappear between the check and the click when a server
     // update arrives (e.g. the test already left the seat), so never wait long.
     if (await page.locator('#resign').isVisible()) {

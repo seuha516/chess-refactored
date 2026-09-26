@@ -82,6 +82,8 @@ export interface RoomSummary {
   readonly status: 'waiting' | 'playing';
   /** Waiting players, or white and black while playing. */
   readonly players: readonly string[];
+  /** Public ids of the same players, so a visitor can find their own game. */
+  readonly playerIds: readonly string[];
   readonly createdAt: number;
 }
 
@@ -129,6 +131,20 @@ export interface MoveRequest {
   readonly ply: number;
 }
 
+/**
+ * A player pulling their 몽돌이 (the pebble at their corner of the 3D table),
+ * sent a few times a second while they pull and once when they let go, so
+ * the others see it stretch and spring back. Purely for fun: no game effect.
+ */
+export interface MascotTug {
+  /** Where it was taken hold of, in the pebble's own frame. */
+  readonly grab: readonly [number, number, number];
+  /** How far that point is pulled, in the same frame. */
+  readonly pull: readonly [number, number, number];
+  /** Let go: it springs back. */
+  readonly release: boolean;
+}
+
 export interface ClientToServerEvents {
   'profile:set-name': (name: string, ack: Ack) => void;
   /** Subscribe to the room list (leaves the current room). */
@@ -146,12 +162,16 @@ export interface ClientToServerEvents {
   'game:accept-draw': (ack: Ack) => void;
   'game:decline-draw': (ack: Ack) => void;
   'chat:send': (text: string, ack: Ack) => void;
+  /** Fire and forget (no acknowledgement); relayed to the rest of the room. */
+  'mascot:tug': (tug: MascotTug) => void;
 }
 
 export interface ServerToClientEvents {
   session: (session: SessionInfo) => void;
   lobby: (lobby: LobbySnapshot) => void;
   room: (snapshot: RoomSnapshot) => void;
+  /** Someone else in the room pulled their 몽돌이. */
+  mascot: (tug: MascotTug & { readonly playerId: string }) => void;
 }
 
 /** Sent in the Socket.IO handshake (`auth`). */

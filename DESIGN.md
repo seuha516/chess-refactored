@@ -21,7 +21,7 @@ colors:
   check-glow: '#ff4a2e'
   travertine-square: '#e2d6bd'
   slate-square: '#5f6d64'
-  granite: '#26292a'
+  granite: '#46372c'
   alabaster-piece: '#efe7d8'
   basalt-piece: '#2a2e2d'
 typography:
@@ -120,7 +120,7 @@ components:
 **Creative North Star: "The Park Table at Golden Hour"**
 
 The room is a real stone chess table in a park, drawn live in 3D (three.js). A low sun comes
-through a tree canopy: dappled light drifts across a polished dark granite slab with an inlaid
+through a tree canopy: dappled light drifts across a polished warm brown granite slab with an inlaid
 travertine and slate board, the coordinates are engraved on the slab for whoever sits at the near
 edge, and everything around the table falls into cool green-black shade. Pieces are carved
 alabaster and black basalt. Every move is stone meeting stone, and the table acts it out.
@@ -143,9 +143,10 @@ A green-black shade scale, warm stone-white text, and one colour of light.
 
 ### Primary
 
-- **Sunlight** (#f5c77e): the running clock, the primary action (방 만들기, 참가, 한 판 더), the
-  latest move in the sheet, the "your turn" status, the invite button while waiting alone, focus
-  rings, the material lead (+3), a room in play in the lobby. Hover Sun Strong (#ffd999). Text on it
+- **Sunlight** (#f5c77e): the running clock, the primary action (방 만들기, 앉아서 시작하기,
+  초대 링크 복사 while waiting alone, 한 판 더), the latest move in the sheet, the "your turn"
+  status, focus rings, the material lead (+3), a room in play and "내 자리" in the lobby, the
+  brand mark. Hover Sun Strong (#ffd999). Text on it
   is Sun Ink (#22190b, 11:1).
 - In the scene the same light marks the selected piece (a warm pool under it), legal targets (small
   pools of light with a Sun Core #fff0cf centre) and capture targets (a ring of light round the
@@ -159,7 +160,8 @@ A green-black shade scale, warm stone-white text, and one colour of light.
 - **Line** (stone-white at 11%) and **Strong Line** (24%): hairline dividers, button borders.
 - **Stone Text** (#ede6d6), **Secondary** (#b9b1a0), **Tertiary** (#918b7e, ≥4.5:1 on Panel Shade).
 - **Travertine** (#e2d6bd) and **Slate** (#5f6d64): board squares in the 2D fallback and the lobby's
-  mini tables. **Granite** (#26292a): their frame.
+  mini tables. **Granite** (#46372c): warm brown, the slab of the 3D table and the frame of the 2D
+  board and mini tables; light enough that basalt pieces stand out on it.
 
 ### State colours
 
@@ -196,10 +198,11 @@ coordinates cut into the slab.
 
 ## Layout
 
-- **Room (≥900px):** the stage (3D table) fills everything left of a side column (380px, 340px below
-  1180px). A transparent top bar spans both: back and room title over the stage, invite, sound and
-  name over the column. The opponent's seat strip sits under the top bar, mine at the bottom; the
-  camera frames the board in the safe area between them (`--safe-*` insets on `.scene`).
+- **Room (≥900px):** the stage fills everything left of a side column (380px, 340px below
+  1180px). The stage is a frame of rows on solid shade: the top bar (back, room title, 초대 링크
+  복사), the opponent's seat strip, the 3D table, my seat strip. Nothing of the UI lies over the
+  stone except the bands across the board; the scene fades into the strips over 36px. Sound and
+  name sit over the column. The camera frames the board in the scene's safe area (`--safe-*`).
 - **Camera:** 30° field of view; elevation 50° on wide stages rising to 64° on tall ones so the
   far squares stay tappable; the distance is fitted to the safe area every resize.
 - **Room (<900px):** top bar, opponent strip, the table (0.9 × screen width tall), my strip, then
@@ -215,12 +218,17 @@ reflections from a generated sky. The UI casts almost nothing.
 
 - **Clock** `0 6px 14px -6px rgb(0 0 0 / 60%)` while running.
 - **Dialog** hairline plus `0 40px 80px -24px rgb(0 0 0 / 80%)` over a 62% shade backdrop.
-- **Banner** `0 16px 32px -12px rgb(0 0 0 / 60%)`.
+- **Banner** Raised shade with a hairline and `0 16px 32px -12px rgb(0 0 0 / 60%)`; a sunlit dot
+  breathes while it reconnects.
 
 ## Motion
 
 - **Arrival:** entering a room, the camera comes down from above the park to the chair (1.5s).
-  Flipping the board orbits the camera 180° with a small rise (1.1s).
+  Flipping the board orbits the camera 180° with a small rise (1.1s), with a sweep of air.
+- **Viewer's angle:** dragging the table outside the board turns (±90°) and tilts (22°–86°) the
+  view, the wheel (only a pinch where the room scrolls as one column) or a pinch brings it closer (0.7–1.35×), a double click restores the chair. The
+  시점 button steps through 기본 시점, 위에서 보기 (84°) and 낮게 보기 (30°), flying there in 0.7s.
+  The angle is remembered in the browser and survives flips.
 - **Move:** the piece is lifted (opponent's: 0.1s), thrown on an arc (0.26–0.52s; knights higher)
   and lands hard: dust ring, a small shake, a click-and-knock sound pitched by piece weight.
 - **Capture:** freeze 60–160ms by the value taken, shake and punch-in, stone chips, a flash; the
@@ -230,21 +238,30 @@ reflections from a generated sky. The UI casts almost nothing.
   band opens (clip-path) and the result is thrown down onto the table (1.75s after the move).
   Resignation, time and disconnection topple the king without slow motion; draws topple nothing.
 - **New game:** every piece arcs home and the fallen king stands up.
+- **Topple direction:** the king falls where its path is clearest (24 directions scored against the
+  pieces around it and the slab edge), sideways when that is as clear.
+- **Lobby arrival:** the heading is carved in from the left (clip-path and blur, 0.9s), then the lead,
+  form and list settle in under it, staggered.
 - Reduced motion: no shake, freeze, slow motion or camera flights; moves are 0.14s slides.
 
 ## Sound
 
 Synthesised with Web Audio (no files): stone clicks and knocks, captures with grit, check, mate,
-topple, setup cascade, promotion, clock ticks (at 30 seconds, then each of the last ten), chimes
+topple, setup cascade, the start of a game (the clock pressed, then a bell rising twice),
+the board turning (a sweep of air), promotion, clock ticks (at 30 seconds, then each of the last ten), chimes
 for a draw offer or someone sitting down. A toggle in the top bar, remembered in the browser.
 
 ## Components
 
 ### Seat strip (signature)
 
-56px row: colour puck (20px, flat alabaster or basalt with a hairline), name with tags (나 · 백 ·
-연결 끊김 · 대기 중), pieces taken with the sunlit material lead, and the clock. An empty seat reads
-빈 자리 and carries 참가.
+68px row on solid shade (60px on phones): colour puck (20px, flat alabaster or basalt with a
+hairline), name with tags (나 · 백 · 대기 중; a disconnected player's tag turns Check Red and counts
+down, 연결 끊김 47초), the pieces taken, and the clock. Taken pieces stack by kind like coins (26px,
+kinds 8px apart); basalt ones carry a hairline of stone light so they read on shade. The material
+lead follows in Hahmlet sunlight (+3). An empty seat reads 빈자리. The clock is Deep Shade with a
+hairline (sunlit while running) and is trimmed to cap height (`text-box`), so the numerals sit in
+the optical centre. While a result is shown, the finished game's players stay on their strips.
 
 ### Stage and board
 
@@ -256,6 +273,44 @@ grid is the 2D board (travertine/slate, SVG pieces, granite rim).
 
 4px cut corners, 40px (36px in controls). Default: transparent with Strong Line border. Primary:
 Sunlight. Danger: Check Red, only to confirm resignation. Ghost: no border.
+
+### 몽돌이 (signature)
+
+A round pebble with a face, one per player, in their piece's stone (alabaster or basalt): two bead
+eyes, a small mouth, a faint blush, and a small gold crown worn askew on top of its head. It sits on
+its player's right-hand side of the board, a little towards them, and faces them; the pieces that
+player takes line up beyond it in rows of three. On phones (stage under 640px) it sits at the table
+edge in front of its player instead. Both are always in the camera's frame.
+
+- **Pull:** take hold of your own and drag; the body stretches towards the pointer with a little
+  lag (soft limit), the mouth turns into an "o", the eyes squeeze and it blushes; let go and it
+  springs back and wobbles, with a squeak on grabbing and a "뽁" on release. Players can pull only
+  their own; before a game, in the lobby or watching, either. Only a player's pull is sent to the
+  room (about 8 updates a second, always the release) and replayed on the other screens.
+- **Reactions:** looks at each move's landing square, flinches at captures (more for the side that
+  lost the piece), trembles when its king is in check, bounces three times when its side wins and
+  sags with a turned-down mouth when it loses, sleeps (eyes shut, slow breathing) in the lobby,
+  blinks now and then.
+- Reduced motion: no flinch, tremble or hops; a pull springs back without wobbling. The 2D board has
+  no 몽돌이.
+
+### Invitation band
+
+Before a game, a shade band (82%) with hairlines across the middle of the board says what to do
+next, in Hahmlet: 빈 테이블 (자리에 앉기), 〈이름〉님이 기다리고 있어요 (앉아서 시작하기, sunlit
+hairlines), or 상대를 기다리는 중 (초대 링크 복사 as the primary action, 앉기 취소). It opens like the
+result band. The join and leave buttons live only here or on the result band.
+
+### Top bar
+
+The brand is a king in sunlit outline beside "Chess" in Hahmlet. Who I am is one button: an initial
+on a stone disc, the name and a small pencil; pressing it renames. In a room the invitation link
+sits with the room title, not with the global tools.
+
+### Lobby resume row
+
+When the visitor has a seat or a game in a listed room, a row under the create form leads back to
+it (a sunlit dot and hairline while the game runs, with the one-minute warning).
 
 ### Result band
 

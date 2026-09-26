@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseChatText,
+  parseMascotTug,
   parseMoveRequest,
   parseName,
   parseToken,
@@ -62,5 +63,28 @@ describe('parseToken', () => {
     expect(parseToken('x'.repeat(65))).toBeNull();
     expect(parseToken('abcdefghijklmnop!')).toBeNull();
     expect(parseToken(undefined)).toBeNull();
+  });
+});
+
+describe('parseMascotTug', () => {
+  it('accepts a small pull and rounds it', () => {
+    expect(
+      parseMascotTug({ grab: [0.12345, 0.5, -0.2], pull: [1.5, -0.25, 0], release: false }),
+    ).toEqual({ grab: [0.123, 0.5, -0.2], pull: [1.5, -0.25, 0], release: false });
+  });
+
+  it('rejects anything else', () => {
+    for (const value of [
+      undefined,
+      'pull',
+      { grab: [0, 0, 0], pull: [0, 0, 0] },
+      { grab: [0, 0, 0, 0], pull: [0, 0, 0], release: true },
+      { grab: [0, 2, 0], pull: [0, 0, 0], release: true },
+      { grab: [0, 0, 0], pull: [0, 0, 9], release: true },
+      { grab: [0, 0, 0], pull: ['1', 0, 0], release: true },
+      { grab: [0, 0, 0], pull: [0, Infinity, 0], release: true },
+    ]) {
+      expect(parseMascotTug(value)).toBeNull();
+    }
   });
 });

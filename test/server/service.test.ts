@@ -132,8 +132,8 @@ describe('lobby and rooms', () => {
     await service.join('Bob-socket', roomId);
     expect(last(roomId)?.online).toBe(2);
     expect(last(roomId)?.chat.map((message) => message.text)).toEqual([
-      'Alice님이 입장하였습니다.',
-      'Bob님이 입장하였습니다.',
+      'Alice님이 들어왔어요.',
+      'Bob님이 들어왔어요.',
     ]);
     await service.leave('Bob-socket');
     expect(last(roomId)?.online).toBe(1);

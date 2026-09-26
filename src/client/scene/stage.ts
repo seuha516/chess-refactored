@@ -59,7 +59,9 @@ import {
   type Square,
 } from '../../shared/chess/index.ts';
 import * as sfx from '../sfx.ts';
+import type { MascotTug } from '../../shared/protocol.ts';
 import type { BoardModel } from '../view-model.ts';
+import { MONGDOL_TOP, Mongdol } from './mongdol.ts';
 import { homography } from './overlay.ts';
 import { impactOf, planMove, type MovePlan } from './plan.ts';
 import { PIECE_HEIGHT, pieceGeometry } from './pieces.ts';
@@ -92,6 +94,23 @@ export interface SceneModel {
   readonly resultTone: 'win' | 'loss' | 'draw' | 'neutral' | null;
 }
 
+/**
+ * Where each 몽돌이 sits: on its player's right-hand side of the board, a
+ * little towards them, where the usual view shows it whole; the pieces that
+ * player takes line up beyond it. It faces its own player (the other one
+ * sees its back and crown). On a narrow screen (a phone) the sides of the
+ * slab are out of view, so it sits at the table edge in front of its player.
+ */
+function mongdolSeat(color: Color, narrow: boolean): { x: number; z: number; yaw: number } {
+  const sign = color === 'w' ? 1 : -1;
+  const turn = color === 'w' ? 0 : Math.PI;
+  return narrow
+    ? { x: sign * 3.25, z: sign * 4.88, yaw: turn - 0.35 }
+    : { x: sign * 5.45, z: sign * 1.3, yaw: turn - 0.55 };
+}
+/** Below this width the stage is a phone's: the 몽돌이 sit at the near edges. */
+const NARROW_STAGE = 640;
+
 /** What the DOM board tells the table while the pointer moves over it. */
 export interface BoardPresenter {
   hover(square: Square | null): void;
@@ -102,6 +121,8 @@ export interface BoardPresenter {
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const coarse = window.matchMedia('(pointer: coarse)');
+/** The room laid out as one scrolling column (see style.css). */
+const singleColumn = window.matchMedia('(width < 900px)');
 
 /** Sunlight, the only accent: what is active stands in the light. */
 const SUN = new Tint('#ffc978');
@@ -129,12 +150,84 @@ function squarePosition(square: Square, target = new Vector3()): Vector3 {
   return target.set(fileOf(square) - 3.5, BOARD_Y, 3.5 - rankOf(square));
 }
 
-/** Where the n-th piece taken by `side` stands on the slab, beside the board. */
+/** Named camera angles the viewer can pick; dragging makes a custom one. */
+export type ViewPreset = 'default' | 'above' | 'low';
+
+interface CameraView {
+  /** Turn round the table from the chair, in radians. */
+  readonly azimuth: number;
+  /** Height of the view in radians, or null for the automatic one (steeper on tall screens). */
+  readonly elevation: number | null;
+  /** Distance factor; below 1 is closer. */
+  readonly zoom: number;
+}
+
+const VIEW_KEY = 'chess.view';
+const VIEW_PRESETS: Record<ViewPreset, CameraView> = {
+  default: { azimuth: 0, elevation: null, zoom: 1 },
+  above: { azimuth: 0, elevation: MathUtils.degToRad(84), zoom: 1 },
+  low: { azimuth: 0, elevation: MathUtils.degToRad(30), zoom: 0.94 },
+};
+const AZIMUTH_LIMIT = MathUtils.degToRad(90);
+const ELEVATION_MIN = MathUtils.degToRad(22);
+const ELEVATION_MAX = MathUtils.degToRad(86);
+const ZOOM_MIN = 0.7;
+const ZOOM_MAX = 1.35;
+
+function presetOf(view: CameraView): ViewPreset | null {
+  const near = (a: number, b: number) => Math.abs(a - b) < 0.005;
+  for (const [name, preset] of Object.entries(VIEW_PRESETS) as [ViewPreset, CameraView][]) {
+    const sameElevation =
+      preset.elevation === null
+        ? view.elevation === null
+        : view.elevation !== null && near(view.elevation, preset.elevation);
+    if (near(view.azimuth, preset.azimuth) && sameElevation && near(view.zoom, preset.zoom)) {
+      return name;
+    }
+  }
+  return null;
+}
+
+/** The last camera angle, remembered in this browser. */
+function loadView(): CameraView {
+  try {
+    const stored = JSON.parse(
+      localStorage.getItem(VIEW_KEY) ?? 'null',
+    ) as Partial<CameraView> | null;
+    if (!stored) return VIEW_PRESETS.default;
+    const number = (value: unknown, fallback: number) =>
+      typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+    return {
+      azimuth: MathUtils.clamp(number(stored.azimuth, 0), -AZIMUTH_LIMIT, AZIMUTH_LIMIT),
+      elevation:
+        typeof stored.elevation === 'number'
+          ? MathUtils.clamp(stored.elevation, ELEVATION_MIN, ELEVATION_MAX)
+          : null,
+      zoom: MathUtils.clamp(number(stored.zoom, 1), ZOOM_MIN, ZOOM_MAX),
+    };
+  } catch {
+    return VIEW_PRESETS.default;
+  }
+}
+
+function saveView(view: CameraView): void {
+  try {
+    localStorage.setItem(VIEW_KEY, JSON.stringify(view));
+  } catch {
+    // Not remembered (private mode); still applies to this page.
+  }
+}
+
+/**
+ * Where the n-th piece taken by `side` stands on the slab: beside the board
+ * on the taker's right, in rows of three from the middle towards the far end
+ * (up to six rows), leaving the near half of that side to its 몽돌이.
+ */
 function gravePosition(side: Color, index: number, target = new Vector3()): Vector3 {
-  const column = Math.floor(index / 8);
-  const row = index % 8;
+  const column = index % 3;
+  const row = Math.floor(index / 3);
   const sign = side === 'w' ? 1 : -1;
-  return target.set(sign * (5.2 + column * 0.82), BOARD_Y, sign * (3.55 - row * 0.98));
+  return target.set(sign * (5.12 + column * 0.8), BOARD_Y, sign * (0.3 - row * 0.9));
 }
 
 /**
@@ -263,6 +356,20 @@ export class TableStage implements BoardPresenter {
   } | null = null;
   #orientation: Color = 'w';
   #focusHold = 0;
+  /** The viewer's own camera angle at the table, relative to the chair. */
+  #view: CameraView = loadView();
+  #orbit: { id: number; x: number; y: number; start: CameraView } | null = null;
+  readonly #touches = new Map<number, { x: number; y: number }>();
+  #pinch: { distance: number; zoom: number } | null = null;
+  #onViewChange: (preset: ViewPreset | null) => void = () => undefined;
+  readonly #mongdols: Record<Color, Mongdol>;
+  /** A 몽돌이 being pulled here: the pointer, the plane it moves in, where it took hold. */
+  #tug: { color: Color; id: number; plane: Plane; from: Vector3; offset: Vector3 } | null = null;
+  #onTug: (color: Color, tug: MascotTug) => void = () => undefined;
+  readonly #remoteTimers: Record<Color, ReturnType<typeof setTimeout> | undefined> = {
+    w: undefined,
+    b: undefined,
+  };
 
   #model: SceneModel | null = null;
   #shown: Board | null = null;
@@ -352,12 +459,24 @@ export class TableStage implements BoardPresenter {
 
     this.#buildTable();
     this.#markers = this.#buildMarkers();
+    const still = () => reducedMotion.matches;
+    this.#mongdols = {
+      w: new Mongdol(this.#pieceMaterials.w, false, still),
+      b: new Mongdol(this.#pieceMaterials.b, true, still),
+    };
+    for (const color of ['w', 'b'] as const) {
+      const seat = mongdolSeat(color, false);
+      this.#mongdols[color].place(seat.x, BOARD_Y, seat.z, seat.yaw);
+      this.#mongdols[color].setMood('sleep');
+      this.#scene.add(this.#mongdols[color].root);
+    }
     this.#dust = this.#buildDust();
     this.#chips = this.#buildChips();
 
     this.#resize = new ResizeObserver(() => {
       this.#measureHost();
     });
+    this.#bindOrbit(renderer.domElement);
     reducedMotion.addEventListener('change', () => {
       this.#wake();
     });
@@ -631,10 +750,15 @@ export class TableStage implements BoardPresenter {
   mount(host: HTMLElement, mode: SceneMode, overlay: HTMLElement | null): void {
     const previousMode = this.#mode;
     if (this.#host !== host) {
-      if (this.#host) this.#resize.unobserve(this.#host);
+      if (this.#host) {
+        this.#resize.unobserve(this.#host);
+        this.#host.removeEventListener('wheel', this.#onWheel);
+      }
       host.prepend(this.#renderer.domElement);
       this.#host = host;
       this.#resize.observe(host);
+      // Over the board too: the wheel brings the table closer or further.
+      host.addEventListener('wheel', this.#onWheel, { passive: false });
     }
     this.#overlay = overlay;
     this.#overlayKey = '';
@@ -671,6 +795,10 @@ export class TableStage implements BoardPresenter {
     };
     this.#width = width;
     this.#height = height;
+    for (const color of ['w', 'b'] as const) {
+      const seat = mongdolSeat(color, this.#narrow());
+      this.#mongdols[color].place(seat.x, BOARD_Y, seat.z, seat.yaw);
+    }
     this.#renderer.setSize(width, height, false);
     this.#fitCache.clear();
     this.#overlayKey = '';
@@ -697,13 +825,285 @@ export class TableStage implements BoardPresenter {
   }
 
   #roomPose(): Pose {
+    const view = this.#view;
     return {
-      azimuth: this.#goalAzimuth(),
-      elevation: this.#elevation(),
-      zoom: 1,
+      azimuth: this.#goalAzimuth() + view.azimuth,
+      elevation: view.elevation ?? this.#elevation(),
+      zoom: view.zoom,
       focus: new Vector3(),
     };
   }
+
+  // -------------------------------------------------------- viewer's angle
+
+  /** The named angle the camera is at, or null after dragging it somewhere else. */
+  get viewPreset(): ViewPreset | null {
+    return presetOf(this.#view);
+  }
+
+  /** Called whenever the viewer's angle changes (by a preset or by dragging). */
+  onViewChange(listener: (preset: ViewPreset | null) => void): void {
+    this.#onViewChange = listener;
+  }
+
+  /** Flies the camera to a named angle. */
+  setView(preset: ViewPreset): void {
+    this.#view = VIEW_PRESETS[preset];
+    saveView(this.#view);
+    this.#onViewChange(preset);
+    if (this.#mode !== 'room') return;
+    this.#focusHold = 0;
+    this.#flyTo(this.#roomPose(), 0.7);
+  }
+
+  /** Follows the pointer: the camera moves at once, without a flight. */
+  #follow(view: CameraView): void {
+    this.#view = view;
+    this.#onViewChange(presetOf(view));
+    this.#poseAnim = null;
+    this.#focusHold = 0;
+    this.#pose = this.#roomPose();
+    this.#wake();
+  }
+
+  /**
+   * Dragging the table (outside the board, which takes piece moves) turns
+   * and tilts the view; two fingers pinch it closer; a double click puts the
+   * chair back where it was.
+   */
+  #bindOrbit(canvas: HTMLCanvasElement): void {
+    const distance = () => {
+      const [a, b] = [...this.#touches.values()];
+      return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+    };
+    canvas.addEventListener('pointerdown', (event) => {
+      if (this.#startTug(event, canvas)) return;
+      if (this.#mode !== 'room') return;
+      if (event.pointerType === 'touch') {
+        this.#touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (this.#touches.size === 2) {
+          this.#orbit = null;
+          this.#pinch = { distance: Math.max(1, distance()), zoom: this.#view.zoom };
+          return;
+        }
+      } else if (event.button !== 0 && event.button !== 2) {
+        return;
+      }
+      canvas.setPointerCapture(event.pointerId);
+      this.#orbit = { id: event.pointerId, x: event.clientX, y: event.clientY, start: this.#view };
+      canvas.classList.add('orbiting');
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (this.#moveTug(event)) return;
+      if (event.pointerType === 'mouse' && !this.#orbit) {
+        const hit = this.#mongdolAt(event.clientX, event.clientY, canvas);
+        canvas.classList.toggle('over-mongdol', hit !== null && this.#mayPull(hit.color));
+      }
+      if (this.#touches.has(event.pointerId)) {
+        this.#touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      }
+      const pinch = this.#pinch;
+      if (pinch && this.#touches.size === 2) {
+        const zoom = (pinch.zoom * pinch.distance) / Math.max(1, distance());
+        this.#follow({ ...this.#view, zoom: MathUtils.clamp(zoom, ZOOM_MIN, ZOOM_MAX) });
+        return;
+      }
+      const orbit = this.#orbit;
+      if (orbit?.id !== event.pointerId) return;
+      const { start } = orbit;
+      const elevation = (start.elevation ?? this.#elevation()) + (event.clientY - orbit.y) * 0.005;
+      this.#follow({
+        azimuth: MathUtils.clamp(
+          start.azimuth - (event.clientX - orbit.x) * 0.006,
+          -AZIMUTH_LIMIT,
+          AZIMUTH_LIMIT,
+        ),
+        elevation: MathUtils.clamp(elevation, ELEVATION_MIN, ELEVATION_MAX),
+        zoom: start.zoom,
+      });
+    });
+    const end = (event: PointerEvent) => {
+      if (this.#endTug(event, canvas)) return;
+      this.#touches.delete(event.pointerId);
+      if (this.#touches.size < 2) this.#pinch = null;
+      if (this.#orbit?.id === event.pointerId) {
+        this.#orbit = null;
+        canvas.classList.remove('orbiting');
+      }
+      saveView(this.#view);
+    };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+    canvas.addEventListener('dblclick', (event) => {
+      if (this.#mode === 'room' && !this.#mongdolAt(event.clientX, event.clientY, canvas)) {
+        this.setView('default');
+      }
+    });
+    // Right-dragging turns the table too, without a menu popping up.
+    canvas.addEventListener('contextmenu', (event) => {
+      if (this.#mode === 'room') event.preventDefault();
+    });
+  }
+
+  // ------------------------------------------------------------- 몽돌이
+
+  /** Called with every pull of the viewer's own 몽돌이, to show it to the others. */
+  onTug(listener: (color: Color, tug: MascotTug) => void): void {
+    this.#onTug = listener;
+  }
+
+  /** A 몽돌이 pulled on someone else's screen, replayed here. */
+  remoteTug(color: Color, tug: MascotTug): void {
+    const mongdol = this.#mongdols[color];
+    if (this.#tug?.color === color) return; // this viewer is holding it
+    clearTimeout(this.#remoteTimers[color]);
+    const grab = new Vector3(...tug.grab);
+    if (!mongdol.held || mongdol.grab.distanceToSquared(grab) > 1e-6) {
+      mongdol.hold(grab);
+    }
+    mongdol.pullTo(new Vector3(...tug.pull));
+    if (tug.release) {
+      sfx.popSound(mongdol.release(true), 0.6);
+    } else {
+      // Let go by itself if the release never arrives.
+      this.#remoteTimers[color] = setTimeout(() => {
+        if (mongdol.held && this.#tug?.color !== color) mongdol.release();
+        this.#wake();
+      }, 1500);
+    }
+    this.#wake();
+  }
+
+  /** Which 몽돌이 is under the pointer, and where it was touched (world). */
+  #mongdolAt(
+    clientX: number,
+    clientY: number,
+    canvas: HTMLCanvasElement,
+  ): { color: Color; point: Vector3 } | null {
+    const rect = canvas.getBoundingClientRect();
+    const ndc = new Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.#raycaster.setFromCamera(ndc, this.#camera);
+    let best: { color: Color; point: Vector3; distance: number } | null = null;
+    for (const color of ['w', 'b'] as const) {
+      const [hit] = this.#raycaster.intersectObject(this.#mongdols[color].body, false);
+      if (hit && (!best || hit.distance < best.distance)) {
+        best = { color, point: hit.point.clone(), distance: hit.distance };
+      }
+    }
+    return best;
+  }
+
+  /** Players pull only their own; before a game, in the lobby or watching, anyone may pull either. */
+  #mayPull(color: Color): boolean {
+    const me = this.#mode === 'room' ? (this.#model?.me ?? null) : null;
+    return me === null || me === color;
+  }
+
+  #startTug(event: PointerEvent, canvas: HTMLCanvasElement): boolean {
+    if (this.#tug || (event.pointerType === 'mouse' && event.button !== 0)) return false;
+    const hit = this.#mongdolAt(event.clientX, event.clientY, canvas);
+    if (!hit || !this.#mayPull(hit.color)) return false;
+    const mongdol = this.#mongdols[hit.color];
+    const normal = this.#camera.getWorldDirection(new Vector3()).negate();
+    this.#tug = {
+      color: hit.color,
+      id: event.pointerId,
+      plane: new Plane().setFromNormalAndCoplanarPoint(normal, hit.point),
+      from: hit.point,
+      offset: new Vector3(),
+    };
+    canvas.setPointerCapture(event.pointerId);
+    canvas.classList.add('tugging');
+    mongdol.hold(mongdol.body.worldToLocal(hit.point.clone()));
+    sfx.squeakSound();
+    this.#emitTug(false);
+    this.#wake();
+    return true;
+  }
+
+  #moveTug(event: PointerEvent): boolean {
+    const tug = this.#tug;
+    if (tug?.id !== event.pointerId) return false;
+    const canvas = this.#renderer.domElement;
+    const rect = canvas.getBoundingClientRect();
+    this.#raycaster.setFromCamera(
+      new Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      ),
+      this.#camera,
+    );
+    const point = this.#raycaster.ray.intersectPlane(tug.plane, new Vector3());
+    if (!point) return true;
+    const mongdol = this.#mongdols[tug.color];
+    // Into the pebble's own frame, so the other screen can replay it as is.
+    tug.offset.copy(point).sub(tug.from).applyQuaternion(mongdol.root.quaternion.clone().invert());
+    mongdol.pullTo(tug.offset);
+    this.#emitTug(false);
+    this.#wake();
+    return true;
+  }
+
+  #endTug(event: PointerEvent, canvas: HTMLCanvasElement): boolean {
+    const tug = this.#tug;
+    if (tug?.id !== event.pointerId) return false;
+    this.#tug = null;
+    canvas.classList.remove('tugging');
+    this.#emitTug(true, tug);
+    sfx.popSound(this.#mongdols[tug.color].release());
+    this.#wake();
+    return true;
+  }
+
+  #emitTug(release: boolean, tug = this.#tug): void {
+    if (!tug || this.#mode !== 'room' || this.#model?.me !== tug.color) return;
+    const mongdol = this.#mongdols[tug.color];
+    // Within what the server accepts (|grab| ≤ 1, |pull| ≤ 3): a long drag
+    // stretches no further anyway (the pull is soft-limited below 1).
+    const round = (v: Vector3, limit: number) =>
+      [v.x, v.y, v.z].map((n) => Math.round(MathUtils.clamp(n, -limit, limit) * 1000) / 1000) as [
+        number,
+        number,
+        number,
+      ];
+    const pull = tug.offset.clone().clampLength(0, 2.5);
+    this.#onTug(tug.color, { grab: round(mongdol.grab, 1), pull: round(pull, 3), release });
+  }
+
+  /** The pebbles' mood follows the table: asleep in the lobby, awake at a game. */
+  #settleMongdols(model: SceneModel, immediate: boolean): void {
+    if (this.#mode === 'lobby') {
+      this.#mongdols.w.setMood('sleep');
+      this.#mongdols.b.setMood('sleep');
+      return;
+    }
+    if (model.status !== 'finished') {
+      this.#mongdols.w.setMood('idle');
+      this.#mongdols.b.setMood('idle');
+    } else if (immediate) this.#showOutcome(model);
+  }
+
+  #showOutcome(model: SceneModel): void {
+    const winner = model.outcome?.winner ?? null;
+    for (const color of ['w', 'b'] as const) {
+      this.#mongdols[color].setMood(winner === null ? 'idle' : winner === color ? 'happy' : 'sad');
+    }
+  }
+
+  #onWheel = (event: WheelEvent): void => {
+    if (this.#mode !== 'room' || event.deltaY === 0) return;
+    // Where the room is a scrolling page (one column), the wheel scrolls it;
+    // only a pinch (which arrives as ctrl + wheel) zooms there.
+    if (singleColumn.matches && !event.ctrlKey) return;
+    event.preventDefault();
+    const delta = event.deltaY * (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1);
+    const zoom = this.#view.zoom * Math.exp(delta * 0.0012);
+    this.#follow({ ...this.#view, zoom: MathUtils.clamp(zoom, ZOOM_MIN, ZOOM_MAX) });
+    saveView(this.#view);
+  };
 
   #lobbyPose(): Pose {
     return { azimuth: this.#pose.azimuth, elevation: 0.6, zoom: 1, focus: new Vector3() };
@@ -730,6 +1130,10 @@ export class TableStage implements BoardPresenter {
     this.#wake();
   }
 
+  #narrow(): boolean {
+    return this.#mode === 'room' && this.#width < NARROW_STAGE;
+  }
+
   /** Region the camera keeps in frame, in world units. */
   #regionOfInterest(azimuth: number): Vector3[] {
     const points: Vector3[] = [];
@@ -740,6 +1144,13 @@ export class TableStage implements BoardPresenter {
       }
       // The far pieces stand up out of the board's far edge.
       points.push(new Vector3(sx * x, h, -z));
+    }
+    // Both 몽돌이, crowns and all.
+    if (this.#mode === 'room') {
+      for (const color of ['w', 'b'] as const) {
+        const seat = mongdolSeat(color, this.#narrow());
+        points.push(new Vector3(seat.x, MONGDOL_TOP, seat.z));
+      }
     }
     return points.map((point) => point.applyAxisAngle(new Vector3(0, 1, 0), azimuth));
   }
@@ -803,6 +1214,8 @@ export class TableStage implements BoardPresenter {
       offsetX: (box.minX + box.maxX) / 2 - (this.#insets.left + safe.w / 2),
       offsetY: (box.minY + box.maxY) / 2 - (this.#insets.top + safe.h / 2),
     };
+    // Dragging the view measures many angles; keep the cache small.
+    if (this.#fitCache.size > 300) this.#fitCache.clear();
     this.#fitCache.set(key, result);
     return result;
   }
@@ -919,6 +1332,8 @@ export class TableStage implements BoardPresenter {
       if (this.#tweens[i]?.step(dt)) this.#tweens.splice(i, 1);
     }
     const settling = this.#settleActors(dt);
+    // The pebbles keep their own time: a hit-stop should not stop a pull.
+    const wobbling = [this.#mongdols.w.step(realDt), this.#mongdols.b.step(realDt)].some(Boolean);
     const effects = this.#stepEffects(frozen ? 0 : realDt * this.#timeScale);
     this.#updateCamera(dt, realDt);
     this.#updateMarkers(realDt);
@@ -945,6 +1360,7 @@ export class TableStage implements BoardPresenter {
       this.#punch > 0 ||
       frozen ||
       this.#drag !== null ||
+      wobbling ||
       this.#model?.board.check != null ||
       this.#model?.board.selected != null;
     const ambient = !still || (this.#mode === 'lobby' && !reducedMotion.matches);
@@ -1074,6 +1490,11 @@ export class TableStage implements BoardPresenter {
     const orientationChanged = model.board.orientation !== this.#orientation;
     this.#orientation = model.board.orientation;
     if (orientationChanged) this.#engrave(this.#orientation);
+    // A game ending in play shows its outcome with the result (see #ending), not before.
+    this.#settleMongdols(
+      model,
+      this.#shown === null || (this.#status !== model.status && this.#status !== 'playing'),
+    );
     if (orientationChanged && this.#mode === 'room') {
       // A flip orbits the table; the first look (or an arrival) just aims there.
       this.#flyTo(this.#roomPose(), previous || this.#poseAnim ? 1.1 : 0);
@@ -1150,6 +1571,8 @@ export class TableStage implements BoardPresenter {
     if (model.board.check !== null) {
       const king = this.#actorAt(model.board.check);
       if (king) this.#shudder(king, 0.5);
+      const checked = model.board.board[model.board.check]?.color;
+      if (checked) this.#mongdols[checked].tremble();
       this.#impact(0.45, squarePosition(model.board.check), false);
       sfx.checkSound();
       if (model.me && model.board.board[model.board.check]?.color === model.me) sfx.buzz(30);
@@ -1375,6 +1798,9 @@ export class TableStage implements BoardPresenter {
     // The mover claims its square now, so the next snapshot finds it there.
     actor.place = { kind: 'board', square: plan.to };
     if (plan.promotion) actor.type = plan.promotion;
+    const landing = squarePosition(plan.to);
+    this.#mongdols.w.lookAt(landing);
+    this.#mongdols.b.lookAt(landing);
     if (victim) {
       victim.place = { kind: 'grave', side: actor.color, index: this.#graveCount(actor.color) };
       victim.token++;
@@ -1474,6 +1900,8 @@ export class TableStage implements BoardPresenter {
     this.#chipsBurst(at, 10 + value * 3, weight);
     sfx.captureSound(value);
     if (this.#model?.me === victim.color) sfx.buzz(18);
+    this.#mongdols[victim.color].flinch(0.6 + value * 0.05);
+    this.#mongdols[attacker.color].flinch(0.3);
 
     const place = victim.place;
     if (place.kind !== 'grave') return;
@@ -1572,10 +2000,7 @@ export class TableStage implements BoardPresenter {
     actor.busy = true;
     actor.toppled = true;
     const base = actor.root.position.clone().setY(BOARD_Y);
-    // Falls sideways across the board, so both players see it go down.
-    const fall = new Vector3(Math.random() < 0.5 ? -1 : 1, 0, 0)
-      .applyAxisAngle(new Vector3(0, 1, 0), (Math.random() - 0.5) * 0.7)
-      .normalize();
+    const fall = this.#clearFall(actor, base);
     const radius = 0.3;
     const pivot = base.clone().addScaledVector(fall, radius);
     const axis = new Vector3().crossVectors(new Vector3(0, 1, 0), fall).normalize();
@@ -1626,6 +2051,38 @@ export class TableStage implements BoardPresenter {
     );
   }
 
+  /**
+   * Where a toppling piece can lie down without sinking into the pieces
+   * around it: the direction whose path is clearest, sideways across the
+   * board (so both players see it go down) when that is just as clear.
+   */
+  #clearFall(actor: Actor, base: Vector3): Vector3 {
+    const reach = PIECE_HEIGHT[actor.type] + 0.3;
+    const others = [...this.#actors].filter((other) => other !== actor);
+    let best = new Vector3(1, 0, 0);
+    let bestScore = Infinity;
+    for (let step = 0; step < 24; step++) {
+      const angle = (step / 24) * Math.PI * 2;
+      const direction = new Vector3(Math.cos(angle), 0, Math.sin(angle));
+      let score = 0;
+      for (let distance = 0.4; distance <= reach; distance += 0.2) {
+        const x = base.x + direction.x * distance;
+        const z = base.z + direction.z * distance;
+        for (const other of others) {
+          const gap = Math.hypot(other.root.position.x - x, other.root.position.z - z);
+          if (gap < 0.62) score += 0.62 - gap;
+        }
+        if (Math.abs(x) > SLAB_W / 2 - 0.3 || Math.abs(z) > SLAB_D / 2 - 0.3) score += 1;
+      }
+      score += Math.abs(direction.z) * 0.12 + Math.random() * 0.04;
+      if (score < bestScore) {
+        bestScore = score;
+        best = direction;
+      }
+    }
+    return best;
+  }
+
   /** Checkmate: a freeze, slow motion, the camera closes in, the king falls. */
   #mate(model: SceneModel): void {
     const loser = model.outcome?.winner === 'w' ? 'b' : 'w';
@@ -1645,7 +2102,12 @@ export class TableStage implements BoardPresenter {
     this.#timeScale = 0.4;
     const focus = at.clone().multiplyScalar(0.7);
     this.#flyTo(
-      { ...this.#roomPose(), zoom: 0.8, focus, elevation: this.#elevation() + 0.06 },
+      {
+        ...this.#roomPose(),
+        zoom: this.#view.zoom * 0.8,
+        focus,
+        elevation: Math.min(ELEVATION_MAX, this.#roomPose().elevation + 0.06),
+      },
       1.3,
     );
     this.#focusHold = 3.4;
@@ -1674,6 +2136,7 @@ export class TableStage implements BoardPresenter {
           }
         }
       }
+      this.#showOutcome(model);
       if (model.resultTone)
         this.#wait(toppled ? 0.1 : 0.5, () => {
           if (model.resultTone) sfx.endSound(model.resultTone);

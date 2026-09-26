@@ -54,33 +54,37 @@ function state(me: string | null, room: Partial<RoomSnapshot>, extra: Partial<Cl
 const sq = (name: string) => parseSquare(name) ?? -1;
 
 describe('buildView', () => {
-  it('shows the lobby with seat controls', () => {
+  it('invites a visitor to join the player who is waiting', () => {
     const view = buildView(state('carol', { seats: [alice] }));
-    // The free seat faces the viewer, with the join button on it.
+    // The free seat faces the viewer.
     expect(view.seats).toEqual({
-      top: { player: { text: 'Alice', connected: true, me: false }, color: null, action: null },
-      bottom: { player: null, color: null, action: 'take' },
+      top: {
+        player: { text: 'Alice', connected: true, me: false, forfeitInMs: null },
+        color: null,
+      },
+      bottom: { player: null, color: null },
     });
     expect(view.controls).toMatchObject({ seatTake: true, seatLeave: false, draw: 'hidden' });
-    expect(view.status).toBe('참가 버튼을 눌러 대국에 참가하세요. (1/2)');
+    expect(view.status).toBe('Alice님이 기다리고 있어요');
+    expect(view.invitation).toMatchObject({ kind: 'join', title: 'Alice님이 기다리고 있어요' });
     expect(view.clock).toBeNull();
+    expect(buildView(state('carol', {})).invitation?.kind).toBe('empty');
   });
 
-  it('lets a seated player cancel', () => {
+  it('lets a seated player wait for a friend, or stand up', () => {
     const view = buildView(state('alice', { seats: [alice] }));
     expect(view.controls).toMatchObject({ seatTake: false, seatLeave: true });
-    expect(view.seats.bottom).toMatchObject({
-      player: { text: 'Alice', me: true },
-      action: 'leave',
-    });
+    expect(view.seats.bottom).toMatchObject({ player: { text: 'Alice', me: true } });
     expect(view.seats.top.player).toBeNull();
-    expect(view.status).toBe('상대를 기다리는 중입니다. (1/2)');
+    expect(view.status).toBe('상대를 기다리는 중');
+    expect(view.invitation?.kind).toBe('waiting');
   });
 
   it('shows a full table to a spectator without a join button', () => {
     const view = buildView(state('carol', { seats: [alice, bob] }));
-    expect(view.seats.bottom).toMatchObject({ player: { text: 'Alice' }, action: null });
-    expect(view.seats.top).toMatchObject({ player: { text: 'Bob' }, action: null });
+    expect(view.seats.bottom).toMatchObject({ player: { text: 'Alice' } });
+    expect(view.seats.top).toMatchObject({ player: { text: 'Bob' } });
+    expect(view.controls.seatTake).toBe(false);
   });
 
   it('seats each player on their colour side, following the board orientation', () => {
@@ -95,11 +99,13 @@ describe('buildView', () => {
     const white = buildView(state('alice', { game: game() }));
     expect(white.myColor).toBe('w');
     expect(white.legalMoves).toHaveLength(20);
-    expect(white.status).toBe('당신의 차례입니다.');
+    expect(white.status).toBe('내 차례');
     const black = buildView(state('bob', { game: game() }));
     expect(black.legalMoves).toHaveLength(0);
-    expect(black.status).toBe('Alice(백)의 차례입니다.');
+    expect(black.status).toBe('상대 차례');
     const spectator = buildView(state('carol', { game: game() }));
+    expect(spectator.status).toBe('Alice(백) 차례');
+    expect(spectator.invitation).toBeNull();
     expect(spectator.legalMoves).toHaveLength(0);
     expect(spectator.controls).toMatchObject({ resign: false, draw: 'hidden', seatTake: false });
   });
@@ -142,7 +148,7 @@ describe('buildView', () => {
     expect(view.board.check).toBe(sq('e1'));
     expect(view.moveRows.map(moveRowText)).toEqual(['1. f3 e5', '2. g4 Qh4#']);
     expect(view.moveRows[1]).toEqual({ number: 2, white: 'g4', black: 'Qh4#' });
-    expect(view.result).toEqual({ title: '패배', reason: '체크메이트에 의해', tone: 'loss' });
+    expect(view.result).toEqual({ title: '패배', reason: '체크메이트', tone: 'loss' });
   });
 
   it('describes results for spectators and draws', () => {
@@ -154,20 +160,27 @@ describe('buildView', () => {
       });
     expect(buildView(state('carol', { game: finished('w') })).result).toEqual({
       title: '백 승리',
-      reason: '시간 초과에 의해',
+      reason: '시간 초과',
       tone: 'neutral',
     });
     expect(buildView(state('bob', { game: finished(null) })).result?.title).toBe('무승부');
     // The referee line leads with the result while it is shown.
-    expect(buildView(state('carol', { game: finished('w') })).status).toBe(
-      '시간 초과에 의해 백 승리. 다시 두려면 참가하세요. (0/2)',
-    );
-    expect(
-      buildView(state('carol', { game: finished('w') }, { dismissedResult: 'g1' })).status,
-    ).toBe('참가 버튼을 눌러 대국에 참가하세요. (0/2)');
+    expect(buildView(state('carol', { game: finished('w') })).status).toBe('백 승리 · 시간 초과');
+    // The invitation waits until the result is put away.
+    expect(buildView(state('carol', { game: finished('w') })).invitation).toBeNull();
+    const dismissed = buildView(state('carol', { game: finished('w') }, { dismissedResult: 'g1' }));
+    expect(dismissed.status).toBe('아직 아무도 앉지 않았어요');
+    expect(dismissed.invitation?.kind).toBe('empty');
     expect(
       buildView(state('bob', { game: finished('b') }, { dismissedResult: 'g1' })).result,
     ).toBeNull();
+    // The players stay at the table while the result is shown, until someone sits down again.
+    const shown = buildView(state('carol', { game: finished('w') }));
+    expect(shown.seats.bottom).toMatchObject({ player: { text: 'Alice' }, color: 'w' });
+    expect(shown.clock).toBeNull();
+    expect(dismissed.seats.bottom.player).toBeNull();
+    const again = buildView(state('carol', { game: finished('w'), seats: [bob] }));
+    expect(again.seats.top).toMatchObject({ player: { text: 'Bob' }, color: null });
   });
 
   it('lists captured pieces by colour in the original order', () => {
@@ -191,9 +204,13 @@ describe('buildView', () => {
     const offered = game({ drawOffer: 'w' });
     expect(buildView(state('alice', { game: offered })).controls.draw).toBe('offered');
     expect(buildView(state('bob', { game: offered })).controls.draw).toBe('respond');
-    expect(buildView(state('bob', { game: offered })).status).toContain(
-      '상대가 무승부를 제안했습니다.',
-    );
+    expect(buildView(state('bob', { game: offered })).notes).toEqual([
+      '상대가 무승부를 제안했어요.',
+    ]);
+    expect(buildView(state('carol', { game: offered })).notes).toEqual([
+      '백이 무승부를 제안했어요.',
+    ]);
+    expect(buildView(state('carol', { game: game() })).notes).toEqual([]);
   });
 });
 
@@ -220,9 +237,21 @@ describe('time rules in the view', () => {
   it('counts down a disconnected player and asks for a sync when due', () => {
     const away = game({ black: { ...bob, connected: false, disconnectedAt: AT - 20_000 } });
     const view = buildView(state('alice', { game: away }), AT);
-    expect(view.status).toContain(
-      'Bob님의 연결이 끊겼습니다. 40초 안에 돌아오지 않으면 기권패로 처리됩니다.',
-    );
+    expect(view.notes).toEqual([
+      'Bob님의 연결이 끊겼어요.',
+      '1분 안에 돌아오지 않으면 기권패예요.',
+    ]);
+    // Both gone: named together, the warning once.
+    const both = game({
+      white: { ...alice, connected: false, disconnectedAt: AT - 5_000 },
+      black: { ...bob, connected: false, disconnectedAt: AT - 20_000 },
+    });
+    expect(buildView(state('carol', { game: both }), AT).notes).toEqual([
+      'Alice님과 Bob님의 연결이 끊겼어요.',
+      '1분 안에 돌아오지 않으면 기권패예요.',
+    ]);
+    // The seconds left count down on the seat, not in the (announced) status line.
+    expect(view.seats.top.player?.forfeitInMs).toBe(40_000);
     expect(view.syncAt).toBe(AT + 40_000);
   });
 
@@ -236,18 +265,35 @@ describe('time rules in the view', () => {
 describe('lobbyRows', () => {
   it('describes waiting and running rooms', () => {
     expect(
-      lobbyRows({
-        rooms: [
-          { id: 'a', name: 'A', status: 'waiting', players: ['Alice'], createdAt: 1 },
-          { id: 'b', name: 'B', status: 'waiting', players: [], createdAt: 1 },
-          { id: 'c', name: 'C', status: 'playing', players: ['Alice', 'Bob'], createdAt: 1 },
-        ],
-      }).map(({ status, seats }) => ({ status, seats })),
+      lobbyRows(
+        {
+          rooms: [
+            {
+              id: 'a',
+              name: 'A',
+              status: 'waiting',
+              players: ['Alice'],
+              playerIds: ['alice'],
+              createdAt: 1,
+            },
+            { id: 'b', name: 'B', status: 'waiting', players: [], playerIds: [], createdAt: 1 },
+            {
+              id: 'c',
+              name: 'C',
+              status: 'playing',
+              players: ['Alice', 'Bob'],
+              playerIds: ['alice', 'bob'],
+              createdAt: 1,
+            },
+          ],
+        },
+        'bob',
+      ).map(({ status, seats, mine }) => ({ status, seats, mine })),
     ).toEqual([
-      { status: '대기 중 (1/2)', seats: [null, 'Alice'] },
-      { status: '대기 중 (0/2)', seats: [null, null] },
+      { status: '1명 대기', seats: [null, 'Alice'], mine: false },
+      { status: '빈 테이블', seats: [null, null], mine: false },
       // White sits at the near edge.
-      { status: '대국 중', seats: ['Bob', 'Alice'] },
+      { status: '대국 중', seats: ['Bob', 'Alice'], mine: true },
     ]);
   });
 });

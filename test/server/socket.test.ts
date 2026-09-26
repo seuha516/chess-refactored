@@ -249,6 +249,63 @@ describe('playing through sockets', () => {
   });
 });
 
+describe('몽돌이 (mascot) pulls', () => {
+  it('passes a pull on to the rest of the room, marked with the puller, and nowhere else', async () => {
+    const { white, black, roomId } = await startGame();
+    const watcher = await connect({ name: 'watcher' });
+    await joinRoom(watcher, roomId);
+    const outsider = await connect({ name: 'outsider' });
+    await joinRoom(outsider, await createRoom(outsider));
+    const seen: { black: unknown[]; watcher: unknown[]; white: unknown[]; outsider: unknown[] } = {
+      black: [],
+      watcher: [],
+      white: [],
+      outsider: [],
+    };
+    black.socket.on('mascot', (tug) => seen.black.push(tug));
+    watcher.socket.on('mascot', (tug) => seen.watcher.push(tug));
+    white.socket.on('mascot', (tug) => seen.white.push(tug));
+    outsider.socket.on('mascot', (tug) => seen.outsider.push(tug));
+
+    const tug = { grab: [0.1, 0.5, 0.2], pull: [0.3, 0.4, -0.2], release: true };
+    expect(await request(white.socket, 'mascot:tug', tug)).toEqual({ ok: true });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const expected = { ...tug, playerId: white.session.playerId };
+    expect(seen.black).toEqual([expected]);
+    expect(seen.watcher).toEqual([expected]);
+    expect(seen.white).toEqual([]);
+    expect(seen.outsider).toEqual([]);
+  });
+
+  it('refuses malformed pulls and pulls from outside a room', async () => {
+    const { white } = await startGame();
+    const bad = [
+      null,
+      { grab: [0, 0], pull: [0, 0, 0], release: false },
+      { grab: [0, 0, 5], pull: [0, 0, 0], release: false },
+      { grab: [0, 0, 0], pull: [0, Number.NaN, 0], release: false },
+      { grab: [0, 0, 0], pull: [0, 0, 0], release: 'yes' },
+    ];
+    for (const payload of bad) {
+      expect(await request(white.socket, 'mascot:tug', payload)).toEqual({
+        ok: false,
+        error: 'invalid-payload',
+      });
+    }
+    const lonely = await connect({ name: 'lonely' });
+    const tug = { grab: [0, 0.4, 0], pull: [0.2, 0, 0], release: false };
+    expect(await request(lonely.socket, 'mascot:tug', tug)).toEqual({
+      ok: false,
+      error: 'not-in-room',
+    });
+    // Its own limit: a dozen a second is plenty for eight updates while pulling.
+    const answers = await Promise.all(
+      Array.from({ length: 14 }, () => request(white.socket, 'mascot:tug', tug)),
+    );
+    expect(answers).toContainEqual({ ok: false, error: 'rate-limited' });
+  });
+});
+
 describe('abuse protection', () => {
   it('rate-limits event floods per socket', async () => {
     await server.close();

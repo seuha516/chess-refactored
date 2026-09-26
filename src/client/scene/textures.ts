@@ -197,18 +197,19 @@ export function slabTexture(
   const [colorCanvas, color] = canvas(w, h);
   const [roughCanvas, rough] = canvas(w, h);
   const rand = random(7);
-  color.fillStyle = '#26292a';
+  // Warm brown granite: dark enough for the sunlight, light enough for basalt pieces.
+  color.fillStyle = '#46372c';
   color.fillRect(0, 0, w, h);
   specks(
     color,
     rand,
     Math.round(w * h * 0.012),
-    ['#3b3f3f', '#1a1c1d', '#4a4d4b', '#15171a'],
+    ['#57463a', '#34281f', '#655242', '#2c221b'],
     0.8,
     3.4,
   );
-  specks(color, rand, Math.round(w * h * 0.0005), ['#6f6c66', '#7d786e', '#5a5853'], 0.6, 2);
-  specks(color, rand, Math.round(w * h * 0.00012), ['#5b3f36', '#6b5a4c'], 1.5, 4);
+  specks(color, rand, Math.round(w * h * 0.0005), ['#9a8870', '#a8977e', '#857462'], 0.6, 2);
+  specks(color, rand, Math.round(w * h * 0.00012), ['#6e3f2c', '#7d6450'], 1.5, 4);
   rough.fillStyle = '#4a4a4a';
   rough.fillRect(0, 0, w, h);
   specks(rough, rand, Math.round(w * h * 0.004), ['#666', '#3a3a3a'], 1, 4);
@@ -260,10 +261,10 @@ export function slabTexture(
 export function graniteTexture(size = 256): Texture {
   const [element, context] = canvas(size);
   const rand = random(11);
-  context.fillStyle = '#2c2f2f';
+  context.fillStyle = '#3d3027';
   context.fillRect(0, 0, size, size);
-  specks(context, rand, size * size * 0.03, ['#3c4040', '#1d2021', '#4e514f', '#222'], 0.6, 2.2);
-  specks(context, rand, size * size * 0.004, ['#8f8b82', '#aaa396'], 0.5, 1.6);
+  specks(context, rand, size * size * 0.03, ['#4c3d31', '#2a2019', '#5a493b', '#241b15'], 0.6, 2.2);
+  specks(context, rand, size * size * 0.004, ['#9c8a70', '#b09c80'], 0.5, 1.6);
   return texture(element, true, true);
 }
 

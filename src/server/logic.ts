@@ -63,12 +63,20 @@ const REASON_TEXT: Record<EndReason, string> = {
   'threefold-repetition': '3회 동형 반복',
   'fifty-move-rule': '50수 규칙',
   resignation: '기권',
-  agreement: '무승부 합의',
+  agreement: '합의',
   timeout: '시간 초과',
   'timeout-vs-insufficient-material': '시간 초과 및 기물 부족',
   disconnection: '연결 끊김',
   'disconnection-vs-insufficient-material': '연결 끊김 및 기물 부족',
 };
+
+/** "체크메이트로", "기권으로": the particle that follows the word's last syllable. */
+function withRo(word: string): string {
+  const code = word.charCodeAt(word.length - 1) - 0xac00;
+  const final = code >= 0 && code < 11172 ? code % 28 : 0;
+  // No final consonant, or ㄹ (8), takes 로; any other takes 으로.
+  return `${word}${final === 0 || final === 8 ? '로' : '으로'}`;
+}
 
 // ------------------------------------------------------------------ replay
 
@@ -194,9 +202,7 @@ function finishGame(room: RoomRecord, outcome: Outcome, at: number): RoomRecord 
   const reason = REASON_TEXT[outcome.reason];
   return system(
     { ...room, game: finished },
-    winner
-      ? `${reason}에 의해 ${winner.name}의 승리로 경기를 종료합니다.`
-      : `${reason}에 의해 무승부로 경기를 종료합니다.`,
+    winner ? `${withRo(reason)} ${winner.name} 승리` : `${withRo(reason)} 무승부`,
     at,
   );
 }
@@ -288,7 +294,7 @@ export function announceJoin(
   const recentlyHere =
     isConnected(presence, player.id, now) || (since !== null && now - since < 120_000);
   if (recentlyHere) return null;
-  return touch(system(room, `${player.name}님이 입장하였습니다.`, now), now);
+  return touch(system(room, `${player.name}님이 들어왔어요.`, now), now);
 }
 
 // ------------------------------------------------------------------- seats
@@ -320,7 +326,7 @@ export function takeSeat(room: RoomRecord, player: PlayerRef, ctx: Context): Tra
     touch(
       system(
         { ...room, seats: [], game },
-        `${white.name}(백)와 ${black.name}(흑)의 대결을 시작합니다.`,
+        `대국 시작 · 백 ${white.name}, 흑 ${black.name}`,
         ctx.now,
       ),
       ctx.now,
@@ -379,7 +385,7 @@ export function move(
       drawOffer: rejectsOffer ? null : game.drawOffer,
     },
   };
-  if (rejectsOffer) next = system(next, '무승부 제안이 거절되었습니다.', ctx.now);
+  if (rejectsOffer) next = system(next, '무승부 제안이 거절됐어요.', ctx.now);
   if (chess.outcome) next = finishGame(next, chess.outcome, ctx.now);
   return ok(touch(next, ctx.now));
 }
@@ -408,7 +414,7 @@ export function offerDraw(room: RoomRecord, player: PlayerRef, ctx: Context): Tr
     ...room,
     game: { ...game, drawOffer: color, lastOfferPly: { ...game.lastOfferPly, [color]: ply } },
   };
-  return ok(touch(system(next, `${player.name}님이 무승부를 제안했습니다.`, ctx.now), ctx.now));
+  return ok(touch(system(next, `${player.name}님이 무승부를 제안했어요.`, ctx.now), ctx.now));
 }
 
 export function acceptDraw(room: RoomRecord, player: PlayerRef, ctx: Context): Transition {
@@ -423,7 +429,7 @@ export function declineDraw(room: RoomRecord, player: PlayerRef, ctx: Context): 
   if (typeof found === 'string') return fail(found);
   if (found.game.drawOffer !== opposite(found.color)) return fail('no-draw-offer');
   const next: RoomRecord = { ...room, game: { ...found.game, drawOffer: null } };
-  return ok(touch(system(next, '무승부 제안이 거절되었습니다.', ctx.now), ctx.now));
+  return ok(touch(system(next, '무승부 제안이 거절됐어요.', ctx.now), ctx.now));
 }
 
 export function chat(room: RoomRecord, player: PlayerRef, text: string, ctx: Context): Transition {
@@ -497,6 +503,7 @@ export function toSummary(room: RoomRecord): RoomSummary {
     name: room.name,
     status: playing ? 'playing' : 'waiting',
     players: playing ? [game.white.name, game.black.name] : room.seats.map((seat) => seat.name),
+    playerIds: playing ? [game.white.id, game.black.id] : room.seats.map((seat) => seat.id),
     createdAt: room.createdAt,
   };
 }

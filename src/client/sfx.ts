@@ -164,6 +164,27 @@ function crumble(v: Voice, gain: number, duration: number): void {
   source.stop(v.at + duration + 0.05);
 }
 
+/** Moving air: noise through a band that sweeps up and back down. */
+function sweep(v: Voice, gain: number, duration: number, low: number, high: number): void {
+  if (!noise) return;
+  const source = v.audio.createBufferSource();
+  source.buffer = noise;
+  source.loop = true;
+  const filter = v.audio.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.Q.value = 0.9;
+  filter.frequency.setValueAtTime(low, v.at);
+  filter.frequency.exponentialRampToValueAtTime(high, v.at + duration * 0.45);
+  filter.frequency.exponentialRampToValueAtTime(low * 0.8, v.at + duration);
+  const envelope = v.audio.createGain();
+  envelope.gain.setValueAtTime(0, v.at);
+  envelope.gain.linearRampToValueAtTime(gain, v.at + duration * 0.45);
+  envelope.gain.linearRampToValueAtTime(0, v.at + duration);
+  source.connect(filter).connect(envelope).connect(v.out);
+  source.start(v.at, Math.random() * 0.5);
+  source.stop(v.at + duration + 0.05);
+}
+
 /** Heavier pieces sound lower. */
 const PITCH: Record<string, number> = { p: 1.18, n: 1.04, b: 1.08, r: 0.94, q: 0.88, k: 0.82 };
 
@@ -239,6 +260,52 @@ export function setupSound(count: number, duration: number): void {
     click(v, 0.22, 2800 * pitch, 0.04);
     tone(v, 0.1, 220 * pitch, 0.07, 'triangle');
   }
+}
+
+/** The game begins: the clock button is pressed, then a bell rings twice, rising. */
+export function startSound(delay = 0): void {
+  const press = voice(delay, 0.2);
+  if (!press) return;
+  click(press, 0.7, 1500, 0.06, 0.9);
+  tone(press, 0.35, 160, 0.1, 'triangle', 120);
+  for (const [index, frequency] of [587.33, 880].entries()) {
+    const bell = voice(delay + 0.14 + index * 0.2, 0.7);
+    if (!bell) return;
+    tone(bell, 0.16, frequency, 1.5, 'sine');
+    // Inharmonic partials make it a bell, not a beep.
+    tone(bell, 0.05, frequency * 2.76, 0.6, 'sine');
+    tone(bell, 0.03, frequency * 5.4, 0.3, 'sine');
+  }
+}
+
+/** 몽돌이 taken hold of: a tiny rubbery squeak. */
+export function squeakSound(): void {
+  const v = voice(0, 0.1);
+  if (!v) return;
+  tone(v, 0.06, 820, 0.09, 'sine', 1180);
+}
+
+/** 몽돌이 let go: "뽁", deeper and louder the further it was stretched (0..1). */
+export function popSound(stretch: number, gain = 1): void {
+  const v = voice(0, 0.25);
+  if (!v || stretch < 0.05) return;
+  const size = MathClamp(stretch);
+  tone(v, (0.18 + size * 0.3) * gain, 620 - size * 220, 0.12, 'sine', 240 - size * 60);
+  click(v, (0.12 + size * 0.2) * gain, 1800, 0.03, 1.2);
+  // The wobble after it: two soft, falling bounces.
+  for (const [index, delay] of [0.16, 0.3].entries()) {
+    const bounce = voice(delay, 0.2);
+    if (bounce) tone(bounce, 0.05 * size * gain * (1 - index * 0.4), 360, 0.08, 'sine', 300);
+  }
+}
+
+const MathClamp = (value: number) => Math.min(1, Math.max(0, value));
+
+/** The board turning round: a sweep of air as the view circles the table. */
+export function flipSound(duration: number): void {
+  const v = voice(0, 0.35);
+  if (!v) return;
+  sweep(v, 0.22, duration, 380, 1700);
 }
 
 /** A piece turning into another on the last rank. */

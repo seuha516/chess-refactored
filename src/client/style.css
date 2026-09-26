@@ -23,7 +23,7 @@
   --red-strong: #c8412c;
   --sq-light: #e2d6bd;
   --sq-dark: #5f6d64;
-  --granite: #26292a;
+  --granite: #46372c;
 
   --font:
     'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui,
@@ -258,14 +258,28 @@ input[type='text']:focus-visible {
 }
 
 .brand {
+  display: flex;
   flex: none;
+  align-items: center;
+  gap: 9px;
   border-radius: 2px;
   color: var(--text);
   font-family: var(--font-display);
   font-size: 22px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   text-decoration: none;
+}
+
+/* The mark: a king in outline, cut like the coordinates on the slab. */
+.brand-mark {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: var(--sun);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 body[data-route='room'] .brand {
@@ -320,36 +334,57 @@ body[data-route='room'] .brand {
   margin-left: auto;
 }
 
-#copy-link.invite {
-  border-color: var(--sun);
-  background: var(--sun);
-  color: var(--sun-ink);
+#copy-link {
+  margin-left: 8px;
+  color: var(--text-2);
 }
 
-#copy-link.invite:hover {
-  border-color: var(--sun-strong);
-  background: var(--sun-strong);
+#copy-link:hover {
+  color: var(--text);
 }
 
 #copy-link.done {
   color: var(--sun);
 }
 
-#copy-link.invite.done {
-  color: var(--sun-ink);
-}
-
 #sound[aria-pressed='false'] {
   color: var(--text-3);
 }
 
+/* Who I am: an initial on a stone disc and the name; pressing it renames. */
 .me {
   display: flex;
   align-items: center;
-  gap: 0;
-  margin-left: 4px;
-  padding-left: 12px;
-  border-left: 1px solid var(--line-strong);
+  gap: 9px;
+  min-height: 40px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 0.14s;
+}
+
+.me:hover {
+  background: rgb(232 224 204 / 8%);
+}
+
+.me-initial {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--shade-4);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .me-name {
@@ -361,21 +396,121 @@ body[data-route='room'] .brand {
   white-space: nowrap;
 }
 
+.me-edit {
+  width: 15px;
+  height: 15px;
+  color: var(--text-3);
+  transition: color 0.14s;
+}
+
+.me:hover .me-edit {
+  color: var(--text);
+}
+
 .connection-banner {
   position: fixed;
-  top: calc(var(--topbar) + 8px);
+  top: calc(var(--topbar) + 10px);
   left: 50%;
   z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
   max-width: calc(100vw - 32px);
-  padding: 10px 16px;
+  padding: 10px 16px 10px 14px;
   border-radius: 4px;
-  background: var(--sun);
-  color: var(--sun-ink);
+  background: var(--shade-3);
+  box-shadow:
+    inset 0 0 0 1px var(--line-strong),
+    0 16px 32px -12px rgb(0 0 0 / 60%);
+  color: var(--text);
   font-size: 14px;
-  font-weight: 650;
-  text-align: center;
+  font-weight: 600;
   translate: -50% 0;
-  box-shadow: 0 16px 32px -12px rgb(0 0 0 / 60%);
+  animation: rise 0.22s var(--ease-out);
+}
+
+/* A light that keeps trying. */
+.connection-banner::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sun);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/*
+ * Leaving a game in progress: the question opens under the back button,
+ * where the eye already is, with a red hairline because a loss is at stake.
+ */
+.leave-confirm {
+  position: absolute;
+  top: calc(var(--topbar) - 4px);
+  left: 14px;
+  z-index: 40;
+  display: grid;
+  gap: 4px;
+  width: min(340px, calc(100vw - 28px));
+  padding: 16px 16px 14px;
+  border-radius: 6px;
+  background: var(--shade-3);
+  box-shadow:
+    inset 0 0 0 1px rgb(229 96 74 / 60%),
+    0 28px 56px -18px rgb(0 0 0 / 80%);
+  animation: drop 0.22s var(--ease-out);
+}
+
+/* A notch pointing at the button it belongs to. */
+.leave-confirm::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 26px;
+  width: 11px;
+  height: 11px;
+  border-top: 1px solid rgb(229 96 74 / 60%);
+  border-left: 1px solid rgb(229 96 74 / 60%);
+  background: var(--shade-3);
+  rotate: 45deg;
+}
+
+.leave-confirm-title {
+  font-size: 15.5px;
+  font-weight: 700;
+}
+
+.leave-confirm-text {
+  color: var(--text-2);
+  font-size: 14px;
+  text-wrap: balance;
+}
+
+.leave-confirm .confirm-actions {
+  margin-top: 10px;
+}
+
+.leave-confirm .button {
+  min-height: 38px;
+}
+
+#back-to-lobby[aria-expanded='true'] {
+  background: rgb(229 96 74 / 14%);
+  color: var(--red);
+}
+
+@keyframes drop {
+  from {
+    opacity: 0;
+    translate: 0 -6px;
+  }
 }
 
 /* ---------------------------------------------------------------- lobby */
@@ -419,17 +554,136 @@ body[data-route='room'] .brand {
   font-family: var(--font-display);
   font-size: clamp(44px, 6vw, 76px);
   font-weight: 700;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.03em;
   line-height: 1.02;
 }
 
 .lead {
-  max-width: 28em;
-  margin-top: 18px;
+  max-width: 30em;
+  margin-top: 16px;
   color: var(--text-2);
   font-size: 17.5px;
-  line-height: 1.55;
+  line-height: 1.6;
   text-wrap: pretty;
+}
+
+/*
+ * Arriving in the lobby: the heading is carved out of the shade from the
+ * left, then the rest settles in under it.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .lobby-intro h1 {
+    animation: carve 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .lobby-intro > :not(h1),
+  .tables {
+    animation: settle 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .lobby-intro > .lead {
+    animation-delay: 0.18s;
+  }
+
+  .lobby-intro > .create-room,
+  .lobby-intro > .resume {
+    animation-delay: 0.26s;
+  }
+
+  .tables {
+    animation-delay: 0.36s;
+  }
+}
+
+@keyframes carve {
+  from {
+    clip-path: inset(0 100% 0 0);
+    filter: blur(6px);
+    translate: -12px 0;
+  }
+
+  to {
+    clip-path: inset(0 -0.2em 0 0);
+  }
+}
+
+@keyframes settle {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+}
+
+/* A game or seat left behind: the way back, in the light. */
+.resume {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 480px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--shade-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.14s,
+    background-color 0.14s;
+}
+
+.resume.playing {
+  border-color: rgb(245 199 126 / 55%);
+}
+
+.resume:hover {
+  border-color: var(--sun);
+  background: var(--shade-3);
+}
+
+.resume-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-2);
+}
+
+.resume.playing .resume-dot {
+  background: var(--sun);
+}
+
+.resume-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.resume-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.resume-name {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resume .icon {
+  color: var(--text-2);
+  transition: translate 0.2s var(--ease-out);
+}
+
+.resume:hover .icon {
+  color: var(--text);
+  translate: 3px 0;
 }
 
 .create-room {
@@ -588,6 +842,12 @@ body[data-route='room'] .brand {
   white-space: nowrap;
 }
 
+.room-item-mine {
+  flex: none;
+  color: var(--sun);
+  font-weight: 650;
+}
+
 .room-item-go {
   color: var(--text-3);
   transition:
@@ -623,19 +883,27 @@ body[data-route='room'] .brand {
   height: 100dvh;
 }
 
+/*
+ * The stage is a frame: the top bar, the opponent's strip, the table, my
+ * strip. The strips stand on solid shade of their own, so names, taken
+ * pieces and clocks never lie over the stone.
+ */
 .stage {
   position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
+  padding-top: var(--topbar);
   overflow: hidden;
   background: var(--shade-1);
 }
 
 /* The canvas and the DOM board over it share this box. */
 .scene {
-  position: absolute;
-  inset: 0;
-  --safe-top: calc(var(--topbar) + 72px);
-  --safe-bottom: 84px;
+  position: relative;
+  min-height: 0;
+  --safe-top: 18px;
+  --safe-bottom: 14px;
   --safe-left: 24px;
   --safe-right: 24px;
 }
@@ -649,43 +917,58 @@ body[data-route='room'] .brand {
   animation: scene-in 0.9s var(--ease-out);
 }
 
+/* In a room the table can be dragged round (outside the board, which takes the moves). */
+.scene .scene-canvas {
+  cursor: grab;
+  touch-action: none;
+}
+
+.scene .scene-canvas.orbiting {
+  cursor: grabbing;
+}
+
+/* 몽돌이 can be taken hold of (in the lobby too); in a room a hand tells it from turning the view. */
+.scene-canvas.over-mongdol {
+  cursor: grab;
+}
+
+.scene .scene-canvas.over-mongdol {
+  cursor: pointer;
+}
+
+.scene-canvas.tugging,
+.scene .scene-canvas.tugging {
+  cursor: grabbing;
+}
+
 @keyframes scene-in {
   from {
     opacity: 0;
   }
 }
 
-/* Shade at the edges of the frame, so type over the scene stays readable. */
+/* The scene fades into the shade of the strips above and below it. */
 .scene::after {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(to bottom, rgb(8 12 10 / 72%), rgb(8 12 10 / 0%) 150px),
-    linear-gradient(to top, rgb(8 12 10 / 60%), rgb(8 12 10 / 0%) 110px);
+    linear-gradient(to bottom, var(--shade-1), rgb(16 23 20 / 0%) 36px),
+    linear-gradient(to top, var(--shade-1), rgb(16 23 20 / 0%) 36px);
   pointer-events: none;
 }
 
 /* A seat at the table edge: who sits there, what they took, their clock. */
 .seat {
-  position: absolute;
-  left: 50%;
+  position: relative;
   z-index: 4;
   display: flex;
+  justify-self: center;
   align-items: center;
   gap: 12px;
   width: min(820px, calc(100% - 48px));
-  height: 56px;
-  translate: -50% 0;
-}
-
-#seat-top {
-  top: calc(var(--topbar) + 6px);
-}
-
-#seat-bottom {
-  bottom: 18px;
+  height: 68px;
 }
 
 .puck {
@@ -743,7 +1026,11 @@ body[data-route='room'] .brand {
 
 .seat[data-state='away'] .seat-name {
   color: var(--text-3);
-  text-decoration: line-through 1px;
+}
+
+.seat[data-state='away'] .seat-tag {
+  color: var(--red);
+  font-variant-numeric: tabular-nums;
 }
 
 .seat-haul {
@@ -754,33 +1041,49 @@ body[data-route='room'] .brand {
   overflow: hidden;
 }
 
+/* The material lead, e.g. +3, after the pieces taken. */
 .seat-haul:not([data-lead=''])::after {
   content: attr(data-lead);
-  margin-left: 12px;
+  margin-left: 10px;
   color: var(--sun);
-  font-size: 13.5px;
+  font-family: var(--font-display);
+  font-size: 15px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .captured {
   display: flex;
+  gap: 8px;
   min-width: 0;
 }
 
+/* Pieces of one kind stack like coins; kinds stand apart. */
+.haul-group {
+  display: flex;
+  padding-right: 11px;
+}
+
 .captured img {
-  width: 22px;
-  height: 22px;
-  margin-right: -7px;
-  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 60%));
+  width: 26px;
+  height: 26px;
+  margin-right: -11px;
+  filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 55%));
+}
+
+/* Basalt pieces on shade: a hairline of light around them, as at the table edge. */
+.captured[data-color='b'] img {
+  filter: drop-shadow(0 0 0.7px rgb(237 230 214 / 95%))
+    drop-shadow(0 0 0.7px rgb(237 230 214 / 60%)) drop-shadow(0 1px 1.5px rgb(0 0 0 / 55%));
 }
 
 .clock {
   flex: none;
   min-width: 5.2ch;
-  padding: 8px 14px 7px;
+  margin-left: auto;
+  padding: 11px 14px;
   border-radius: 4px;
-  background: rgb(10 15 13 / 78%);
+  background: var(--shade-0);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--text-2);
   font-family: var(--font-display);
@@ -790,10 +1093,25 @@ body[data-route='room'] .brand {
   letter-spacing: 0.01em;
   line-height: 1;
   text-align: right;
+  /* Numerals centred on their cap height, not on the em box (which sits them low). */
+  text-box: trim-both cap alphabetic;
   transition:
     background-color 0.2s,
     color 0.2s,
     box-shadow 0.2s;
+}
+
+/* Without text-box (Firefox): Hahmlet's numerals sit ~2px low in the em box. */
+@supports not (text-box: trim-both cap alphabetic) {
+  .clock {
+    padding: 5px 14px 9px;
+  }
+
+  @media (width < 900px) {
+    .clock {
+      padding: 4px 12px 8px;
+    }
+  }
 }
 
 .clock.low {
@@ -820,20 +1138,10 @@ body[data-route='room'] .brand {
   }
 }
 
-.seat-action {
-  display: flex;
-  flex: none;
-  gap: 6px;
-}
-
-.seat-action:empty {
-  display: none;
-}
-
 /* The table, drawn in 2D until (or unless) the 3D scene takes over. */
 .table {
   position: absolute;
-  top: calc(var(--topbar) + 66px);
+  top: 50%;
   left: 50%;
   z-index: 2;
   width: var(--board);
@@ -843,7 +1151,7 @@ body[data-route='room'] .brand {
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 8%),
     0 30px 60px -20px rgb(0 0 0 / 70%);
-  translate: -50% 0;
+  translate: -50% -50%;
 }
 
 body[data-scene='pending'] .table {
@@ -1081,6 +1389,67 @@ body[data-scene='3d'] .square:focus-visible {
   outline-offset: -4px;
 }
 
+/* Before a game: a band across the table that says what to do next. */
+.invite {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  z-index: 5;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 28px 24px 26px;
+  border-block: 1px solid var(--line-strong);
+  background: rgb(8 12 10 / 82%);
+  text-align: center;
+  translate: 0 -50%;
+  animation: band-in 0.38s var(--ease-out) 0.35s both;
+}
+
+.invite[data-kind='join'] {
+  border-color: rgb(245 199 126 / 55%);
+}
+
+.invite-title {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 2.6vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.invite-text {
+  max-width: 30em;
+  color: var(--text-2);
+  font-size: 15px;
+  text-wrap: pretty;
+}
+
+.invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.invite-seat {
+  display: contents;
+}
+
+.invite-actions .button {
+  min-height: 46px;
+  padding: 0 22px;
+  font-size: 15px;
+}
+
+.invite-actions .button.done {
+  border-color: var(--sun-strong);
+  background: var(--sun-strong);
+}
+
 /* The result: a title band across the table. */
 .result {
   position: absolute;
@@ -1217,8 +1586,20 @@ body[data-scene='3d'] .square:focus-visible {
   color: var(--sun);
 }
 
+.status-note {
+  margin-top: 6px;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.status-note span {
+  display: block;
+}
+
 .time-control {
-  margin-top: -8px;
+  margin-top: 4px;
   color: var(--text-3);
   font-size: 13px;
 }
@@ -1240,18 +1621,20 @@ body[data-scene='3d'] .square:focus-visible {
   height: 16px;
 }
 
-#flip {
+/* Ways of looking at the table, apart from the game actions. */
+.view-tools {
+  display: flex;
+  gap: 2px;
   margin-left: auto;
 }
 
-.referee:has(.controls.solo) {
-  grid-template-columns: 1fr auto;
+.view-tools .button {
+  padding: 0 10px;
 }
 
-.controls.solo {
-  grid-row: 1 / span 2;
-  grid-column: 2;
-  align-self: start;
+/* Only the 3D table has a camera to turn. */
+body:not([data-scene='3d']) #view {
+  display: none;
 }
 
 .confirm {
@@ -1554,13 +1937,21 @@ dialog input[type='text'] {
   }
 
   .me {
-    margin-left: 0;
-    padding-left: 8px;
+    gap: 7px;
+    padding: 0 6px;
   }
 
   .me-name {
     max-width: 8ch;
     font-size: 13.5px;
+  }
+
+  .me-edit {
+    display: none;
+  }
+
+  #copy-link {
+    margin-left: 0;
   }
 
   .lobby {
@@ -1597,15 +1988,15 @@ dialog input[type='text'] {
   .stage {
     display: flex;
     flex-direction: column;
+    padding-top: 0;
     overflow: visible;
   }
 
   .seat {
-    position: static;
     width: auto;
-    height: 58px;
+    height: 60px;
     padding: 0 12px;
-    translate: none;
+    justify-self: stretch;
   }
 
   .scene {
@@ -1619,7 +2010,26 @@ dialog input[type='text'] {
   }
 
   .scene::after {
-    background: none;
+    background:
+      linear-gradient(to bottom, var(--shade-1), rgb(16 23 20 / 0%) 18px),
+      linear-gradient(to top, var(--shade-1), rgb(16 23 20 / 0%) 18px);
+  }
+
+  .invite {
+    gap: 4px;
+    padding: 18px 16px;
+  }
+
+  .invite-title {
+    font-size: 23px;
+  }
+
+  .invite-text {
+    font-size: 14px;
+  }
+
+  .invite-actions {
+    margin-top: 10px;
   }
 
   /* The flat board sets its own height. */
@@ -1644,7 +2054,22 @@ dialog input[type='text'] {
   }
 
   .clock {
+    padding: 9px 12px;
     font-size: 26px;
+  }
+
+  .captured img {
+    width: 22px;
+    height: 22px;
+    margin-right: -9px;
+  }
+
+  .haul-group {
+    padding-right: 9px;
+  }
+
+  .captured {
+    gap: 4px;
   }
 
   .side {
@@ -1714,6 +2139,11 @@ dialog input[type='text'] {
 
   .seat-name {
     font-size: 16px;
+  }
+
+  .brand-mark {
+    width: 22px;
+    height: 22px;
   }
 }
 

@@ -58,17 +58,27 @@ export interface PlayerLabel {
   readonly text: string;
   readonly connected: boolean;
   readonly me: boolean;
+  /** Milliseconds a disconnected player has left to come back to their game. */
+  readonly forfeitInMs: number | null;
 }
 
 export type DrawControl = 'hidden' | 'offer' | 'offered' | 'respond';
 
-/** One edge of the table: who sits there and what can be done with the seat. */
+/** One edge of the table: who sits there. */
 export interface SeatView {
   readonly player: PlayerLabel | null;
   /** Piece colour while a game is played; null for a waiting seat. */
   readonly color: Color | null;
-  /** The join or leave button belongs to this seat. */
-  readonly action: 'take' | 'leave' | null;
+}
+
+/**
+ * What the table offers before a game, shown across the board: sit down,
+ * join the player who is waiting, or wait for a friend (and invite them).
+ */
+export interface Invitation {
+  readonly kind: 'empty' | 'join' | 'waiting';
+  readonly title: string;
+  readonly text: string;
 }
 
 export interface MoveRow {
@@ -82,7 +92,11 @@ export interface ViewModel {
   readonly board: BoardModel;
   /** The far edge of the table and the near one (the viewer's side). */
   readonly seats: { readonly top: SeatView; readonly bottom: SeatView };
+  /** The referee line: whose turn it is, or what the table is waiting for. */
   readonly status: string;
+  /** Smaller lines under it for what needs attention: a lost connection, a draw offer. */
+  readonly notes: readonly string[];
+  readonly invitation: Invitation | null;
   readonly moveRows: readonly MoveRow[];
   /** Pieces of each colour that have been captured, in the original display order. */
   readonly captured: Readonly<Record<Color, readonly PieceType[]>>;
@@ -122,10 +136,18 @@ export function colorOf(game: GameSnapshot | null, playerId: string | undefined)
   return null;
 }
 
-const playerLabel = (player: PlayerInfo, me: string | undefined): PlayerLabel => ({
+const playerLabel = (
+  player: PlayerInfo,
+  me: string | undefined,
+  serverNow: number | null = null,
+): PlayerLabel => ({
   text: player.name,
   connected: player.connected,
   me: player.id === me,
+  forfeitInMs:
+    serverNow !== null && player.disconnectedAt !== null
+      ? Math.max(0, player.disconnectedAt + DISCONNECT_FORFEIT_MS - serverNow)
+      : null,
 });
 
 /** During a game each player sits on their colour's side of the board. */
@@ -133,18 +155,18 @@ function gameSeats(
   game: GameSnapshot,
   me: string | undefined,
   orientation: Color,
+  serverNow: number | null,
 ): ViewModel['seats'] {
   const seat = (color: Color): SeatView => ({
-    player: playerLabel(color === 'w' ? game.white : game.black, me),
+    player: playerLabel(color === 'w' ? game.white : game.black, me, serverNow),
     color,
-    action: null,
   });
   return { top: seat(opposite(orientation)), bottom: seat(orientation) };
 }
 
 /**
  * Before a game the viewer's own seat is the near edge. A viewer who is not
- * seated finds the free seat there, facing them, with the join button on it.
+ * seated finds the free seat there, facing them.
  */
 function waitingSeats(
   seats: readonly PlayerInfo[],
@@ -154,17 +176,12 @@ function waitingSeats(
 ): ViewModel['seats'] {
   const mine = seats.find((seat) => seat.id === me);
   const others = seats.filter((seat) => seat !== mine);
-  const seat = (player: PlayerInfo | undefined, action: SeatView['action']): SeatView => ({
+  const seat = (player: PlayerInfo | undefined): SeatView => ({
     player: player ? playerLabel(player, me) : null,
     color: null,
-    action,
   });
-  const near = mine
-    ? seat(mine, 'leave')
-    : seatTake
-      ? seat(undefined, 'take')
-      : seat(others.shift(), null);
-  const far = seat(others[0], null);
+  const near = mine ? seat(mine) : seatTake ? seat(undefined) : seat(others.shift());
+  const far = seat(others[0]);
   return flipped ? { top: near, bottom: far } : { top: far, bottom: near };
 }
 
@@ -196,6 +213,9 @@ export function buildView(state: ClientState, serverNow: number = state.room?.at
   const orientation = state.flipped ? opposite(baseOrientation) : baseOrientation;
   const lost = captured(game);
   const result = resultBanner(state, game, me);
+  // While its result is shown, a finished game keeps its players at the table
+  // (until someone sits down for the next one).
+  const gameAtTable = playing || (result !== null && room?.seats.length === 0);
 
   return {
     myColor,
@@ -209,10 +229,13 @@ export function buildView(state: ClientState, serverNow: number = state.room?.at
       targets,
       movable,
     },
-    seats: playing
-      ? gameSeats(game, me, orientation)
-      : waitingSeats(room?.seats ?? [], me, seatTake, state.flipped),
-    status: statusText(state, game, myColor, position, seatedMe, serverNow, result),
+    seats:
+      game && gameAtTable
+        ? gameSeats(game, me, orientation, playing ? serverNow : null)
+        : waitingSeats(room?.seats ?? [], me, seatTake, state.flipped),
+    status: statusText(state, game, myColor, position, seatedMe, result),
+    notes: playing ? noteLines(game, myColor) : [],
+    invitation: room && !playing && !result ? invitation(room.seats, me) : null,
     moveRows: moveRows(game),
     captured: lost,
     material: material(lost),
@@ -259,39 +282,71 @@ function statusText(
   myColor: Color | null,
   position: Position,
   seatedMe: boolean,
-  serverNow: number,
   result: ViewModel['result'],
 ): string {
-  if (!state.room) return '서버에 연결하는 중…';
+  const room = state.room;
+  if (!room) return '서버에 연결하는 중…';
   if (!game || game.status === 'finished') {
-    const seats = state.room.seats.length;
-    if (seatedMe) return `상대를 기다리는 중입니다. (${String(seats)}/2)`;
-    // While the result is shown, the referee line leads with it.
-    if (result)
-      return `${result.reason} ${result.title}. 다시 두려면 참가하세요. (${String(seats)}/2)`;
-    return `참가 버튼을 눌러 대국에 참가하세요. (${String(seats)}/2)`;
+    if (seatedMe) return '상대를 기다리는 중';
+    // While the result is shown, the referee line repeats it.
+    if (result) return `${result.title} · ${result.reason}`;
+    const waiting = room.seats[0];
+    if (waiting) return `${waiting.name}님이 기다리고 있어요`;
+    return '아직 아무도 앉지 않았어요';
   }
   const mover = position.turn === 'w' ? game.white : game.black;
   const parts: string[] = [];
-  if (myColor === position.turn) parts.push('당신의 차례입니다.');
-  else parts.push(`${mover.name}(${COLOR_NAME[position.turn]})의 차례입니다.`);
+  if (myColor === position.turn) parts.push('내 차례');
+  else if (myColor) parts.push('상대 차례');
+  else parts.push(`${mover.name}(${COLOR_NAME[position.turn]}) 차례`);
   if (isInCheck(position)) parts.push('체크!');
+  return parts.join(' · ');
+}
+
+/**
+ * What needs attention besides the turn, one line each: a lost connection
+ * (both players named together if both are gone), a draw offer.
+ */
+function noteLines(game: GameSnapshot, myColor: Color | null): string[] {
+  const lines: string[] = [];
+  const away = [game.white, game.black].filter((player) => player.disconnectedAt !== null);
+  if (away.length) {
+    lines.push(
+      `${away.map((player) => `${player.name}님`).join('과 ')}의 연결이 끊겼어요.`,
+      '1분 안에 돌아오지 않으면 기권패예요.',
+    );
+  }
   if (game.drawOffer && myColor && game.drawOffer !== myColor) {
-    parts.push('상대가 무승부를 제안했습니다.');
+    lines.push('상대가 무승부를 제안했어요.');
+  } else if (game.drawOffer && myColor) {
+    lines.push('무승부를 제안했어요. 상대의 답을 기다리는 중이에요.');
   } else if (game.drawOffer) {
-    parts.push(`${COLOR_NAME[game.drawOffer]}이 무승부를 제안했습니다.`);
+    lines.push(`${COLOR_NAME[game.drawOffer]}이 무승부를 제안했어요.`);
   }
-  for (const player of [game.white, game.black]) {
-    if (player.disconnectedAt === null) continue;
-    const left = Math.max(
-      0,
-      Math.ceil((player.disconnectedAt + DISCONNECT_FORFEIT_MS - serverNow) / 1000),
-    );
-    parts.push(
-      `${player.name}님의 연결이 끊겼습니다. ${String(left)}초 안에 돌아오지 않으면 기권패로 처리됩니다.`,
-    );
+  return lines;
+}
+
+function invitation(seats: readonly PlayerInfo[], me: string | undefined): Invitation {
+  if (seats.some((seat) => seat.id === me)) {
+    return {
+      kind: 'waiting',
+      title: '상대를 기다리는 중',
+      text: '초대 링크를 보내면 친구가 들어와 바로 앉을 수 있어요.',
+    };
   }
-  return parts.join(' ');
+  const waiting = seats[0];
+  if (waiting) {
+    return {
+      kind: 'join',
+      title: `${waiting.name}님이 기다리고 있어요`,
+      text: '앉으면 바로 시작해요. 백과 흑은 무작위로 정해져요.',
+    };
+  }
+  return {
+    kind: 'empty',
+    title: '빈 테이블',
+    text: '먼저 앉아 두고 친구를 불러 보세요.',
+  };
 }
 
 function moveRows(game: GameSnapshot | null): MoveRow[] {
@@ -366,14 +421,16 @@ export interface LobbyRow {
   readonly id: string;
   readonly name: string;
   readonly playing: boolean;
-  /** "대국 중" or "대기 중 (1/2)". */
+  /** The viewer sits at this table (waiting or playing). */
+  readonly mine: boolean;
+  /** "대국 중", "1명 대기" or "빈 테이블". */
   readonly status: string;
   /** Who sits at the far and the near edge of the table (white is near while playing). */
   readonly seats: readonly [string | null, string | null];
 }
 
 /** One table per room for the lobby. */
-export function lobbyRows(lobby: LobbySnapshot): LobbyRow[] {
+export function lobbyRows(lobby: LobbySnapshot, me?: string): LobbyRow[] {
   return lobby.rooms.map((room) => {
     const [first = null, second = null] = room.players;
     const playing = room.status === 'playing';
@@ -381,7 +438,12 @@ export function lobbyRows(lobby: LobbySnapshot): LobbyRow[] {
       id: room.id,
       name: room.name,
       playing,
-      status: playing ? '대국 중' : `대기 중 (${String(room.players.length)}/2)`,
+      mine: me !== undefined && room.playerIds.includes(me),
+      status: playing
+        ? '대국 중'
+        : room.players.length
+          ? `${String(room.players.length)}명 대기`
+          : '빈 테이블',
       seats: [second, first],
     };
   });
