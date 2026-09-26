@@ -32,6 +32,11 @@ export interface GameServerOptions {
   readonly eventsPerSecond?: number;
   /** New connections allowed per minute and client address. */
   readonly connectionsPerMinute?: number;
+  /**
+   * Request header with the client's address when running behind a trusted
+   * proxy that sets it (Vercel sets `x-real-ip`); otherwise the socket address.
+   */
+  readonly clientAddressHeader?: string;
 }
 
 export interface ChessServerOptions extends GameServerOptions {
@@ -120,6 +125,7 @@ export function attachGameServer(
     httpServer,
     {
       path: SOCKET_PATH,
+      addTrailingSlash: false,
       serveClient: false,
       maxHttpBufferSize: MAX_MESSAGE_BYTES,
       ...options.socket,
@@ -141,7 +147,10 @@ export function attachGameServer(
   const connectionLimiters = new Map<string, RateLimiter>();
   const connectionsPerMinute = options.connectionsPerMinute ?? 30;
   io.use((socket, next) => {
-    const address = socket.handshake.address;
+    const header = options.clientAddressHeader
+      ? socket.handshake.headers[options.clientAddressHeader]
+      : undefined;
+    const address = (typeof header === 'string' && header) || socket.handshake.address;
     if (connectionLimiters.size > 10_000) connectionLimiters.clear();
     let limiter = connectionLimiters.get(address);
     if (!limiter) {

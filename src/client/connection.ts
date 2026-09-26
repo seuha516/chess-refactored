@@ -1,5 +1,10 @@
 import { io, type Socket } from 'socket.io-client';
-import type { AckResult, ClientToServerEvents, ServerToClientEvents } from '../shared/protocol.ts';
+import {
+  SOCKET_PATH,
+  type AckResult,
+  type ClientToServerEvents,
+  type ServerToClientEvents,
+} from '../shared/protocol.ts';
 
 export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -43,6 +48,10 @@ export const saveName = (name: string) => {
 /** Creates the socket without connecting; call `socket.connect()` when ready. */
 export function createSocket(): GameSocket {
   return io({
+    path: SOCKET_PATH,
+    addTrailingSlash: false,
+    // Vercel functions accept WebSocket upgrades but not HTTP long-polling.
+    transports: ['websocket'],
     autoConnect: false,
     // Read on every (re)connection attempt, so a reconnect resumes the session.
     auth: (callback) => {

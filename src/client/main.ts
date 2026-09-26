@@ -167,13 +167,21 @@ function enterRoute(): void {
 
 // ------------------------------------------------------------------ server
 
+// On Vercel the server closes every connection after at most 5 minutes and
+// the client reconnects at once; only show the banner if that takes a while.
+let bannerTimer: ReturnType<typeof setTimeout> | undefined;
 socket.on('connect', () => {
+  clearTimeout(bannerTimer);
   dom.banner.hidden = true;
   enterRoute();
 });
 socket.on('disconnect', () => {
-  dom.banner.textContent = '서버와 연결이 끊어졌습니다. 다시 연결하는 중…';
-  dom.banner.hidden = false;
+  clearTimeout(bannerTimer);
+  if (idleDisconnected) return;
+  bannerTimer = setTimeout(() => {
+    dom.banner.textContent = '서버와 연결이 끊어졌습니다. 다시 연결하는 중…';
+    dom.banner.hidden = false;
+  }, 3000);
 });
 socket.on('connect_error', () => {
   dom.banner.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도합니다…';
@@ -207,6 +215,27 @@ socket.on('room', (room) => {
   for (const message of room.chat) chat.append(message);
   update({ room, selected: positionChanged ? null : state.selected, dismissedResult });
   playSounds(previous, room);
+});
+
+// A tab left in the background (and not playing) disconnects after a while,
+// so idle visitors do not keep a server function running; it reconnects as
+// soon as it is shown again.
+const IDLE_DISCONNECT_MS = 5 * 60_000;
+let idleTimer: ReturnType<typeof setTimeout> | undefined;
+let idleDisconnected = false;
+document.addEventListener('visibilitychange', () => {
+  clearTimeout(idleTimer);
+  if (document.visibilityState === 'hidden') {
+    idleTimer = setTimeout(() => {
+      const playing = state.room?.game?.status === 'playing' && view.myColor !== null;
+      if (playing || !socket.connected) return;
+      idleDisconnected = true;
+      socket.disconnect();
+    }, IDLE_DISCONNECT_MS);
+  } else if (idleDisconnected) {
+    idleDisconnected = false;
+    socket.connect();
+  }
 });
 
 // ------------------------------------------------------------------- moves

@@ -160,5 +160,9 @@ export interface HandshakeAuth {
   readonly name?: string;
 }
 
-/** Socket.IO path, identical in development and on Vercel (see vercel.json). */
-export const SOCKET_PATH = '/socket.io';
+/**
+ * Socket.IO endpoint, identical in development and on Vercel, where it is the
+ * path of the function (api/socket). Used without a trailing slash so the
+ * request path matches the function exactly.
+ */
+export const SOCKET_PATH = '/api/socket';

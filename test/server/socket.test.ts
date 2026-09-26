@@ -10,15 +10,18 @@ import {
   type ChessServer,
   type ChessServerOptions,
 } from '../../src/server/app.ts';
-import type {
-  AckResult,
-  ClientToServerEvents,
-  CreateRoomResult,
-  LobbySnapshot,
-  RoomSnapshot,
-  ServerToClientEvents,
-  SessionInfo,
+import {
+  SOCKET_PATH,
+  type AckResult,
+  type ClientToServerEvents,
+  type CreateRoomResult,
+  type LobbySnapshot,
+  type RoomSnapshot,
+  type ServerToClientEvents,
+  type SessionInfo,
 } from '../../src/shared/protocol.ts';
+
+const socketOptions = { path: SOCKET_PATH, addTrailingSlash: false, transports: ['websocket'] };
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -49,7 +52,7 @@ interface Connected {
 }
 
 async function connect(auth: { token?: string; name?: string } = {}): Promise<Connected> {
-  const socket: Client = connectClient(url, { auth, transports: ['websocket'], forceNew: true });
+  const socket: Client = connectClient(url, { ...socketOptions, auth, forceNew: true });
   clients.push(socket);
   const connected: Connected = { socket, session: undefined as never, rooms: [], lobbies: [] };
   socket.on('room', (snapshot) => connected.rooms.push(snapshot));
@@ -278,7 +281,7 @@ describe('abuse protection', () => {
     await start({ connectionsPerMinute: 2 });
     await connect({ name: 'a' });
     await connect({ name: 'b' });
-    const socket: Client = connectClient(url, { transports: ['websocket'], forceNew: true });
+    const socket: Client = connectClient(url, { ...socketOptions, forceNew: true });
     clients.push(socket);
     const error = await new Promise<Error>((resolve) => socket.once('connect_error', resolve));
     expect(error.message).toBe('rate-limited');
@@ -300,7 +303,7 @@ describe('HTTP', () => {
   });
 
   it('does not grant cross-origin access to the Socket.IO endpoint', async () => {
-    const response = await fetch(`${url}/socket.io/?EIO=4&transport=polling`, {
+    const response = await fetch(`${url}${SOCKET_PATH}?EIO=4&transport=polling`, {
       headers: { Origin: 'https://evil.example' },
     });
     expect(response.headers.get('access-control-allow-origin')).toBeNull();
