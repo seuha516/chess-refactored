@@ -7,6 +7,7 @@ import {
   nameOf,
   openRoom,
   playMoves,
+  uniqueName,
   resign,
   square,
   startGame,
@@ -159,20 +160,21 @@ test('the layout fits a phone screen without horizontal scrolling', async ({ bro
 test('the lobby lists rooms and players can move between rooms', async ({ browser }) => {
   const alice = await join(browser, 'Alice');
   const carol = await join(browser, 'Carol');
-  const url = await openRoom(alice, '금요 대국');
+  const roomName = uniqueName('금요 대국');
+  const url = await openRoom(alice, roomName);
   await alice.click('#seat-take');
 
-  const entry = carol.locator('.room-item', { hasText: '금요 대국' });
+  const entry = carol.locator('.room-item', { hasText: roomName });
   await expect(entry).toContainText('대기 중 (1/2) · Alice');
   await entry.click();
   await expect(carol).toHaveURL(url);
-  await expect(carol.locator('#room-title')).toHaveText('금요 대국');
+  await expect(carol.locator('#room-title')).toHaveText(roomName);
   await expect(carol.locator('#player-1')).toHaveText('Alice');
 
   await carol.click('#back-to-lobby');
   await expect(carol.locator('#lobby-view')).toBeVisible();
   await carol.goBack();
-  await expect(carol.locator('#room-title')).toHaveText('금요 대국');
+  await expect(carol.locator('#room-title')).toHaveText(roomName);
   await alice.click('#seat-leave');
 });
 

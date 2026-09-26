@@ -90,11 +90,18 @@ export async function nameOf(page: Page): Promise<string> {
  */
 export async function cleanUp(): Promise<void> {
   for (const page of openPages.splice(0)) {
+    // Buttons may disappear between the check and the click when a server
+    // update arrives (e.g. the test already left the seat), so never wait long.
     if (await page.locator('#resign').isVisible()) {
       page.once('dialog', (dialog) => void dialog.accept());
-      await page.click('#resign');
+      await page.click('#resign', { timeout: 2000 }).catch(() => undefined);
     }
-    if (await page.locator('#seat-leave').isVisible()) await page.click('#seat-leave');
+    if (await page.locator('#seat-leave').isVisible()) {
+      await page.click('#seat-leave', { timeout: 2000 }).catch(() => undefined);
+    }
     await page.context().close();
   }
 }
+
+/** A room name that is unique per run, so retries and parallel runs do not collide. */
+export const uniqueName = (base: string) => `${base} ${Math.random().toString(36).slice(2, 6)}`;
