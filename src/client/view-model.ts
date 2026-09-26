@@ -15,7 +15,15 @@ import {
   type Position,
   type Square,
 } from '../shared/chess/index.ts';
-import type { GameSnapshot, PlayerInfo, RoomSnapshot, SessionInfo } from '../shared/protocol.ts';
+import { flagTime } from '../shared/clock.ts';
+import {
+  DISCONNECT_FORFEIT_MS,
+  type GameSnapshot,
+  type LobbySnapshot,
+  type PlayerInfo,
+  type RoomSnapshot,
+  type SessionInfo,
+} from '../shared/protocol.ts';
 import { COLOR_NAME, END_REASON } from './text.ts';
 
 export interface BoardModel {
@@ -41,7 +49,7 @@ export interface ClientState {
   /** Show the board from black's side (spectators can flip). */
   readonly flipped: boolean;
   /** Id of the finished game whose result banner was closed. */
-  readonly dismissedResult: number | null;
+  readonly dismissedResult: string | null;
 }
 
 export interface PlayerLabel {
@@ -78,6 +86,11 @@ export interface ViewModel {
     readonly tone: 'win' | 'loss' | 'draw' | 'neutral';
   } | null;
   readonly legalMoves: readonly Move[];
+  /**
+   * Server time at which a time rule (flag fall, disconnection forfeit) is
+   * due. When it passes, the client asks the server to apply it.
+   */
+  readonly syncAt: number | null;
 }
 
 const CAPTURE_ORDER: readonly PieceType[] = ['p', 'n', 'b', 'r', 'q'];
@@ -95,7 +108,11 @@ const playerLabel = (player: PlayerInfo, me: string | undefined, suffix = ''): P
   me: player.id === me,
 });
 
-export function buildView(state: ClientState): ViewModel {
+/**
+ * @param serverNow the current server time, estimated from the snapshot time
+ *   and the local time elapsed since it arrived
+ */
+export function buildView(state: ClientState, serverNow: number = state.room?.at ?? 0): ViewModel {
   const me = state.session?.playerId;
   const room = state.room;
   const game = room?.game ?? null;
@@ -134,7 +151,7 @@ export function buildView(state: ClientState): ViewModel {
       movable,
     },
     players,
-    status: statusText(state, game, myColor, position, seatedMe),
+    status: statusText(state, game, myColor, position, seatedMe, serverNow),
     moveRows: moveRows(game),
     captured: captured(game),
     controls: {
@@ -146,7 +163,26 @@ export function buildView(state: ClientState): ViewModel {
     clock: playing ? game.clock : null,
     result: resultBanner(state, game, me),
     legalMoves: moves,
+    syncAt: playing && room ? syncTime(game, room.at) : null,
   };
+}
+
+/** The earliest pending time rule of a running game, in server time. */
+function syncTime(game: GameSnapshot, snapshotAt: number): number | null {
+  const times: number[] = [];
+  const { running, whiteMs, blackMs } = game.clock;
+  if (running) {
+    const flag = flagTime({
+      remainingMs: { w: whiteMs, b: blackMs },
+      running,
+      startedAt: snapshotAt,
+    });
+    if (flag !== null) times.push(flag);
+  }
+  for (const player of [game.white, game.black]) {
+    if (player.disconnectedAt !== null) times.push(player.disconnectedAt + DISCONNECT_FORFEIT_MS);
+  }
+  return times.length ? Math.min(...times) : null;
 }
 
 function parseUci(uci: string): { from: Square; to: Square } | null {
@@ -161,6 +197,7 @@ function statusText(
   myColor: Color | null,
   position: Position,
   seatedMe: boolean,
+  serverNow: number,
 ): string {
   if (!state.room) return '서버에 연결하는 중…';
   if (!game || game.status === 'finished') {
@@ -178,7 +215,16 @@ function statusText(
   } else if (game.drawOffer) {
     parts.push(`${COLOR_NAME[game.drawOffer]}이 무승부를 제안했습니다.`);
   }
-  if (!mover.connected) parts.push(`${mover.name}님의 연결이 끊겼습니다(시간은 계속 흐릅니다).`);
+  for (const player of [game.white, game.black]) {
+    if (player.disconnectedAt === null) continue;
+    const left = Math.max(
+      0,
+      Math.ceil((player.disconnectedAt + DISCONNECT_FORFEIT_MS - serverNow) / 1000),
+    );
+    parts.push(
+      `${player.name}님의 연결이 끊겼습니다. ${String(left)}초 안에 돌아오지 않으면 기권패로 처리됩니다.`,
+    );
+  }
   return parts.join(' ');
 }
 
@@ -238,4 +284,24 @@ export function formatClock(ms: number): string {
   if (tenths < 100) return `0:0${String(Math.floor(tenths / 10))}.${String(tenths % 10)}`;
   const seconds = Math.ceil(tenths / 10);
   return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+export interface LobbyRow {
+  readonly id: string;
+  readonly name: string;
+  readonly detail: string;
+  readonly playing: boolean;
+}
+
+/** One line per room for the lobby list. */
+export function lobbyRows(lobby: LobbySnapshot): LobbyRow[] {
+  return lobby.rooms.map((room) => ({
+    id: room.id,
+    name: room.name,
+    playing: room.status === 'playing',
+    detail:
+      room.status === 'playing'
+        ? `대국 중 · ${room.players.join(' vs ')}`
+        : `대기 중 (${String(room.players.length)}/2)${room.players.length ? ` · ${room.players.join(', ')}` : ''}`,
+  }));
 }

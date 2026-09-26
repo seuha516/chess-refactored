@@ -12,7 +12,7 @@
   <body>
     <header class="topbar">
       <h1 class="title">Chess</h1>
-      <div class="captured" aria-label="잡힌 기물">
+      <div class="captured" id="captured" aria-label="잡힌 기물" hidden>
         <div
           class="captured-row captured-white"
           id="captured-white"
@@ -28,7 +28,39 @@
 
     <p class="connection-banner" id="connection-banner" role="status" hidden></p>
 
-    <main class="layout">
+    <main class="lobby" id="lobby-view" hidden>
+      <section class="lobby-panel" aria-labelledby="lobby-title">
+        <h2 id="lobby-title">대국실</h2>
+        <form class="create-room" id="create-room">
+          <label class="visually-hidden" for="room-name">방 이름</label>
+          <input
+            id="room-name"
+            type="text"
+            maxlength="24"
+            autocomplete="off"
+            placeholder="방 이름 (선택)"
+          />
+          <button type="submit">방 만들기</button>
+        </form>
+        <p class="status" id="lobby-status" role="status"></p>
+        <ul class="room-list" id="room-list" aria-label="방 목록"></ul>
+        <p class="lobby-empty" id="lobby-empty" hidden>
+          아직 열린 방이 없습니다. 방을 만들고 초대 링크를 친구에게 보내 보세요.
+        </p>
+        <p class="my-info">
+          <span id="lobby-my-name"></span>
+          <button type="button" class="link" id="lobby-rename">이름 변경</button>
+        </p>
+      </section>
+    </main>
+
+    <div class="room-bar" id="room-bar" hidden>
+      <button type="button" class="secondary" id="back-to-lobby">← 로비</button>
+      <h2 class="room-title" id="room-title"></h2>
+      <button type="button" class="secondary" id="copy-link">초대 링크 복사</button>
+    </div>
+
+    <main class="layout" id="room-view" hidden>
       <section class="board-area" aria-label="체스판">
         <div class="board" id="board" role="grid" aria-label="체스판"></div>
         <div class="result" id="result" hidden>

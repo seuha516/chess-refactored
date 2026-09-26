@@ -23,11 +23,17 @@ export const END_REASON: Record<EndReason, string> = {
   agreement: '무승부 합의에 의해',
   timeout: '시간 초과에 의해',
   'timeout-vs-insufficient-material': '시간 초과 및 기물 부족에 의해',
+  disconnection: '연결 끊김(기권)에 의해',
+  'disconnection-vs-insufficient-material': '연결 끊김 및 기물 부족에 의해',
 };
 
 export const ERROR_TEXT: Record<ErrorCode | 'timeout' | 'disconnected', string> = {
   'invalid-payload': '잘못된 요청입니다.',
   'rate-limited': '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.',
+  'no-room': '방을 찾을 수 없습니다. 이미 닫혔을 수 있습니다.',
+  'not-in-room': '먼저 방에 들어가 주세요.',
+  'room-limit': '방이 너무 많습니다. 기존 방을 이용해주세요.',
+  'server-error': '서버에 문제가 생겼습니다. 잠시 후 다시 시도해주세요.',
   'not-a-player': '대국 중인 플레이어만 할 수 있습니다.',
   'not-your-turn': '상대의 차례입니다.',
   'no-game': '진행 중인 대국이 없습니다.',

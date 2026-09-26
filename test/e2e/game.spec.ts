@@ -1,12 +1,27 @@
 import { expect, test } from '@playwright/test';
-import { cleanUp, join, move, nameOf, playMoves, resign, square, startGame } from './helpers.ts';
+import {
+  cleanUp,
+  enterRoom,
+  join,
+  move,
+  nameOf,
+  openRoom,
+  playMoves,
+  resign,
+  square,
+  startGame,
+} from './helpers.ts';
 
 // Colours are assigned randomly, so tests refer to players by colour.
 test.afterEach(cleanUp);
 
 test('two players finish a game by checkmate; a spectator follows along', async ({ browser }) => {
   const spectator = await join(browser, 'Watcher');
-  const [white, black] = await startGame(await join(browser, 'Alice'), await join(browser, 'Bob'));
+  const [white, black] = await startGame(
+    await join(browser, 'Alice'),
+    await join(browser, 'Bob'),
+    spectator,
+  );
 
   // Legal targets are shown for the selected piece.
   await square(white, 'e2').click();
@@ -123,6 +138,7 @@ test('draw offers can be declined and accepted', async ({ browser }) => {
 test('chat shows messages as text, never as HTML', async ({ browser }) => {
   const alice = await join(browser, 'Alice');
   const bob = await join(browser, 'Bob');
+  await enterRoom(bob, await openRoom(alice));
   await alice.fill('#chat-input', '<img src=x onerror=alert(1)> 안녕');
   await alice.press('#chat-input', 'Enter');
   const message = bob.locator('#chat-log li.other').last();
@@ -132,9 +148,51 @@ test('chat shows messages as text, never as HTML', async ({ browser }) => {
 
 test('the layout fits a phone screen without horizontal scrolling', async ({ browser }) => {
   const phone = await join(browser, 'Phone', { width: 375, height: 740 });
+  await openRoom(phone);
   const overflow = await phone.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
   await expect(square(phone, 'h1')).toBeInViewport();
+});
+
+test('the lobby lists rooms and players can move between rooms', async ({ browser }) => {
+  const alice = await join(browser, 'Alice');
+  const carol = await join(browser, 'Carol');
+  const url = await openRoom(alice, '금요 대국');
+  await alice.click('#seat-take');
+
+  const entry = carol.locator('.room-item', { hasText: '금요 대국' });
+  await expect(entry).toContainText('대기 중 (1/2) · Alice');
+  await entry.click();
+  await expect(carol).toHaveURL(url);
+  await expect(carol.locator('#room-title')).toHaveText('금요 대국');
+  await expect(carol.locator('#player-1')).toHaveText('Alice');
+
+  await carol.click('#back-to-lobby');
+  await expect(carol.locator('#lobby-view')).toBeVisible();
+  await carol.goBack();
+  await expect(carol.locator('#room-title')).toHaveText('금요 대국');
+  await alice.click('#seat-leave');
+});
+
+test('games in different rooms are independent', async ({ browser }) => {
+  const [white1, black1] = await startGame(await join(browser, 'A1'), await join(browser, 'B1'));
+  const [white2, black2] = await startGame(await join(browser, 'A2'), await join(browser, 'B2'));
+  await move(white1, 'e2e4');
+  await move(white2, 'd2d4');
+  await expect(black1.locator('#moves li')).toHaveText(['1. e4']);
+  await expect(black2.locator('#moves li')).toHaveText(['1. d4']);
+  await resign(black1);
+  await expect(black2.locator('#board')).toHaveAttribute('data-status', 'playing');
+  await resign(black2);
+});
+
+test('an unknown room link falls back to the lobby', async ({ browser }) => {
+  const alice = await join(browser, 'Alice');
+  await alice.goto('/?room=doesnotexist');
+  await expect(alice.locator('#lobby-view')).toBeVisible();
+  await expect(alice.locator('#lobby-status')).toHaveText(
+    '방을 찾을 수 없습니다. 이미 닫혔을 수 있습니다.',
+  );
 });

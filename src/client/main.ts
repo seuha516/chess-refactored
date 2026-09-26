@@ -1,5 +1,5 @@
 import { squareName, type PromotionPiece, type Square } from '../shared/chess/index.ts';
-import type { RoomSnapshot } from '../shared/protocol.ts';
+import type { CreateRoomResult, LobbySnapshot, RoomSnapshot } from '../shared/protocol.ts';
 import { BoardView, pieceImage } from './board-view.ts';
 import { ChatView } from './chat-view.ts';
 import {
@@ -12,7 +12,14 @@ import {
 } from './connection.ts';
 import { playSound } from './sounds.ts';
 import { ERROR_TEXT, PIECE_NAME } from './text.ts';
-import { buildView, colorOf, formatClock, type ClientState, type ViewModel } from './view-model.ts';
+import {
+  buildView,
+  colorOf,
+  formatClock,
+  lobbyRows,
+  type ClientState,
+  type ViewModel,
+} from './view-model.ts';
 
 const CLOCK_WARNING_MS = 30_000;
 
@@ -23,6 +30,20 @@ function element<T extends HTMLElement>(id: string, type: abstract new () => T):
 }
 
 const dom = {
+  lobbyView: element('lobby-view', HTMLElement),
+  createRoom: element('create-room', HTMLFormElement),
+  roomName: element('room-name', HTMLInputElement),
+  lobbyStatus: element('lobby-status', HTMLElement),
+  roomList: element('room-list', HTMLElement),
+  lobbyEmpty: element('lobby-empty', HTMLElement),
+  lobbyMyName: element('lobby-my-name', HTMLElement),
+  lobbyRename: element('lobby-rename', HTMLButtonElement),
+  roomBar: element('room-bar', HTMLElement),
+  roomTitle: element('room-title', HTMLElement),
+  backToLobby: element('back-to-lobby', HTMLButtonElement),
+  copyLink: element('copy-link', HTMLButtonElement),
+  roomView: element('room-view', HTMLElement),
+  captured: element('captured', HTMLElement),
   board: element('board', HTMLElement),
   result: element('result', HTMLElement),
   resultTitle: element('result-title', HTMLElement),
@@ -56,6 +77,20 @@ const dom = {
   promotionChoices: element('promotion-choices', HTMLElement),
 };
 
+// ------------------------------------------------------------------- state
+
+type Route = { readonly kind: 'lobby' } | { readonly kind: 'room'; readonly roomId: string };
+
+function routeFromUrl(): Route {
+  const roomId = new URLSearchParams(location.search).get('room');
+  return roomId ? { kind: 'room', roomId } : { kind: 'lobby' };
+}
+
+const roomUrl = (roomId: string) =>
+  `${location.origin}${location.pathname}?room=${encodeURIComponent(roomId)}`;
+
+let route: Route = routeFromUrl();
+let lobby: LobbySnapshot | null = null;
 let state: ClientState = {
   session: null,
   room: null,
@@ -65,11 +100,15 @@ let state: ClientState = {
   dismissedResult: null,
 };
 let view: ViewModel = buildView(state);
-/** performance.now() when the last snapshot arrived, for the local clock. */
+/** performance.now() when the last room snapshot arrived, for local clocks. */
 let snapshotAt = 0;
 let clockWarnedFor = '';
+let lastSyncRequest = 0;
 let errorText: string | null = null;
 let errorTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Current server time, estimated from the last snapshot. */
+const serverNow = () => (state.room ? state.room.at + (performance.now() - snapshotAt) : 0);
 
 const socket = createSocket();
 const chat = new ChatView(dom.chatLog);
@@ -84,14 +123,53 @@ const board = new BoardView(dom.board, {
 
 function update(patch: Partial<ClientState>): void {
   state = { ...state, ...patch };
-  view = buildView(state);
+  view = buildView(state, serverNow());
   render();
+}
+
+// ----------------------------------------------------------------- routing
+
+function navigate(next: Route): void {
+  route = next;
+  const url =
+    next.kind === 'room' ? roomUrl(next.roomId) : `${location.origin}${location.pathname}`;
+  if (url !== location.href) history.pushState(null, '', url);
+  enterRoute();
+}
+
+window.addEventListener('popstate', () => {
+  route = routeFromUrl();
+  enterRoute();
+});
+
+/** Shows the current route and subscribes to it on the server. */
+function enterRoute(): void {
+  if (route.kind === 'room') {
+    if (state.room?.id !== route.roomId) {
+      chat.replace([]);
+      update({ room: null, selected: null, pending: false, flipped: false, dismissedResult: null });
+    }
+  }
+  render();
+  if (!socket.connected) return; // re-entered on connect
+  if (route.kind === 'lobby') {
+    void request(socket, 'lobby:enter').then(report);
+    return;
+  }
+  const roomId = route.roomId;
+  void request(socket, 'room:join', roomId).then((result) => {
+    if (result.ok || route.kind !== 'room' || route.roomId !== roomId) return;
+    // The room is gone (or the link is wrong): back to the lobby with a message.
+    navigate({ kind: 'lobby' });
+    report(result);
+  });
 }
 
 // ------------------------------------------------------------------ server
 
 socket.on('connect', () => {
   dom.banner.hidden = true;
+  enterRoute();
 });
 socket.on('disconnect', () => {
   dom.banner.textContent = '서버와 연결이 끊어졌습니다. 다시 연결하는 중…';
@@ -113,22 +191,22 @@ socket.on('session', (session) => {
   chat.setMyId(session.playerId);
   update({ session });
 });
+socket.on('lobby', (snapshot) => {
+  lobby = snapshot;
+  render();
+});
 socket.on('room', (room) => {
+  if (route.kind !== 'room' || route.roomId !== room.id) return;
   const previous = state.room;
   snapshotAt = performance.now();
   const newGame = room.game?.id !== previous?.game?.id;
   const positionChanged = newGame || room.game?.moves.length !== previous?.game?.moves.length;
   let dismissedResult = newGame ? null : state.dismissedResult;
-  // A game that had already ended before this page connected shows no banner.
+  // A game that had already ended before this page joined shows no banner.
   if (previous === null && room.game?.status === 'finished') dismissedResult = room.game.id;
+  for (const message of room.chat) chat.append(message);
   update({ room, selected: positionChanged ? null : state.selected, dismissedResult });
   playSounds(previous, room);
-});
-socket.on('chat:history', (messages) => {
-  chat.replace(messages);
-});
-socket.on('chat', (message) => {
-  chat.append(message);
 });
 
 // ------------------------------------------------------------------- moves
@@ -206,13 +284,52 @@ function report(result: RequestResult): void {
   errorTimer = setTimeout(() => {
     errorText = null;
     render();
-  }, 3000);
+  }, 4000);
   render();
 }
 
 const send = (event: Parameters<typeof request>[1], ...args: unknown[]) => {
   void request(socket, event, ...args).then(report);
 };
+
+dom.createRoom.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const name = dom.roomName.value.trim();
+  void (request(socket, 'room:create', name) as Promise<CreateRoomResult | RequestResult>).then(
+    (result) => {
+      if (!result.ok) {
+        report(result);
+        return;
+      }
+      dom.roomName.value = '';
+      if ('roomId' in result) navigate({ kind: 'room', roomId: result.roomId });
+    },
+  );
+});
+
+dom.roomList.addEventListener('click', (event) => {
+  const target = event.target instanceof Element ? event.target.closest('[data-room]') : null;
+  const roomId = target?.getAttribute('data-room');
+  if (roomId) navigate({ kind: 'room', roomId });
+});
+
+dom.backToLobby.addEventListener('click', () => {
+  navigate({ kind: 'lobby' });
+});
+
+dom.copyLink.addEventListener('click', () => {
+  if (route.kind !== 'room') return;
+  const url = roomUrl(route.roomId);
+  navigator.clipboard.writeText(url).then(
+    () => {
+      dom.copyLink.textContent = '복사했습니다!';
+      setTimeout(() => (dom.copyLink.textContent = '초대 링크 복사'), 2000);
+    },
+    () => {
+      window.prompt('이 링크를 친구에게 보내세요.', url);
+    },
+  );
+});
 
 dom.seatTake.addEventListener('click', () => {
   send('seat:take');
@@ -254,6 +371,7 @@ function openNameDialog(): void {
 }
 
 dom.rename.addEventListener('click', openNameDialog);
+dom.lobbyRename.addEventListener('click', openNameDialog);
 dom.nameDialog.addEventListener('close', () => {
   const name = dom.nameDialog.returnValue === 'ok' ? dom.nameInput.value.trim() : '';
   if (!state.session) {
@@ -273,10 +391,54 @@ dom.nameDialog.addEventListener('close', () => {
 // ------------------------------------------------------------------ render
 
 function render(): void {
+  const inRoom = route.kind === 'room';
+  dom.lobbyView.hidden = inRoom;
+  dom.roomView.hidden = !inRoom;
+  dom.roomBar.hidden = !inRoom;
+  dom.captured.hidden = !inRoom;
+  const myName = state.session ? `내 이름: ${state.session.name}` : '';
+  dom.myName.textContent = myName;
+  dom.lobbyMyName.textContent = myName;
+  if (inRoom) renderRoom();
+  else renderLobby();
+}
+
+function renderLobby(): void {
+  document.title = 'Chess';
+  dom.lobbyStatus.textContent = errorText ?? (lobby ? '' : '방 목록을 불러오는 중…');
+  dom.lobbyStatus.hidden = !dom.lobbyStatus.textContent;
+  dom.lobbyStatus.classList.toggle('error', errorText !== null);
+  const rows = lobby ? lobbyRows(lobby) : [];
+  dom.lobbyEmpty.hidden = !lobby || rows.length > 0;
+  dom.roomList.replaceChildren(
+    ...rows.map((row) => {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `room-item${row.playing ? ' playing' : ''}`;
+      button.dataset.room = row.id;
+      const name = document.createElement('span');
+      name.className = 'room-item-name';
+      name.textContent = row.name;
+      const detail = document.createElement('span');
+      detail.className = 'room-item-detail';
+      detail.textContent = row.detail;
+      button.append(name, detail);
+      item.append(button);
+      return item;
+    }),
+  );
+}
+
+function renderRoom(): void {
+  const room = state.room;
+  dom.roomTitle.textContent = room?.name ?? '';
+  document.title = room ? `${room.name} - Chess` : 'Chess';
+
   board.render(view.board);
   // Moves played so far; lets automated tests wait for the server's answer.
-  dom.board.dataset.ply = String(state.room?.game?.moves.length ?? 0);
-  dom.board.dataset.status = state.room?.game?.status ?? 'none';
+  dom.board.dataset.ply = String(room?.game?.moves.length ?? 0);
+  dom.board.dataset.status = room?.game?.status ?? 'none';
 
   const [first, second] = view.players;
   for (const [node, label] of [
@@ -289,7 +451,7 @@ function render(): void {
     node.title = label && !label.connected ? '연결 끊김' : '';
   }
 
-  dom.status.textContent = errorText ?? view.status;
+  dom.status.textContent = errorText ?? (room ? view.status : '방에 들어가는 중…');
   dom.status.classList.toggle('error', errorText !== null);
 
   renderList(dom.moves, view.moveRows);
@@ -298,7 +460,7 @@ function render(): void {
   renderCaptured(dom.capturedBlack, 'b', view.captured.b);
 
   const { controls } = view;
-  dom.seatTake.hidden = !controls.seatTake;
+  dom.seatTake.hidden = !room || !controls.seatTake;
   dom.seatLeave.hidden = !controls.seatLeave;
   dom.drawOffer.hidden = controls.draw === 'hidden' || controls.draw === 'respond';
   dom.drawOffer.disabled = controls.draw === 'offered';
@@ -314,8 +476,6 @@ function render(): void {
     dom.resultReason.textContent = result.reason;
     dom.result.dataset.tone = result.tone;
   }
-
-  dom.myName.textContent = state.session ? `내 이름: ${state.session.name}` : '';
   renderClock();
 }
 
@@ -381,13 +541,32 @@ function renderClock(): void {
   }
 }
 
-setInterval(renderClock, 100);
+/**
+ * Runs the local clocks. When a time rule is due (a clock reached zero, a
+ * disconnected player's grace period ended), asks the server to apply it:
+ * on Vercel the server instance that armed a timer for it may be gone.
+ */
+let lastFullRender = 0;
+setInterval(() => {
+  if (route.kind !== 'room' || !state.room) return;
+  const now = performance.now();
+  if (now - lastFullRender > 1000) {
+    lastFullRender = now;
+    update({}); // refreshes countdown texts
+  } else {
+    renderClock();
+  }
+  if (view.syncAt !== null && serverNow() >= view.syncAt + 250 && now - lastSyncRequest > 3000) {
+    lastSyncRequest = now;
+    void request(socket, 'room:sync');
+  }
+}, 100);
 
 // ------------------------------------------------------------------ sounds
 
 /** Sound effects of the original game, triggered by snapshot changes. */
 function playSounds(previous: RoomSnapshot | null, next: RoomSnapshot): void {
-  // The first snapshot after loading the page is not an event to announce.
+  // The first snapshot after entering a room is not an event to announce.
   if (!previous) return;
   const before = previous.game;
   const after = next.game;

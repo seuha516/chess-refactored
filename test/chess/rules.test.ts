@@ -282,3 +282,16 @@ describe('resignation and agreement (Online Regulations 5.2 / 5.3)', () => {
     expect(game.play(sq('e2'), sq('e4'))).toEqual({ ok: false, error: 'game-over' });
   });
 });
+
+describe('forfeit by disconnection (Online Regulations 11.4.2)', () => {
+  it('loses like a time forfeit, including the insufficient-material draw', () => {
+    expect(new ChessGame().forfeitByDisconnection('w')).toEqual({
+      winner: 'b',
+      reason: 'disconnection',
+    });
+    expect(gameFrom('4k3/8/8/8/8/8/8/R3K3 w - - 0 1').forfeitByDisconnection('w')).toEqual({
+      winner: null,
+      reason: 'disconnection-vs-insufficient-material',
+    });
+  });
+});

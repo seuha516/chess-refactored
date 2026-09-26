@@ -2,7 +2,7 @@ import { expect, type Browser, type Page } from '@playwright/test';
 
 const openPages: Page[] = [];
 
-/** Opens the app in a fresh browser context and joins with the given name. */
+/** Opens the app in a fresh browser context, enters the name and lands in the lobby. */
 export async function join(
   browser: Browser,
   name: string,
@@ -15,14 +15,36 @@ export async function join(
   await expect(page.locator('#name-dialog')).toBeVisible();
   await page.fill('#name-input', name);
   await page.click('#name-dialog button[value=ok]');
-  await expect(page.locator('#my-name')).toHaveText(`내 이름: ${name}`);
+  await expect(page.locator('#lobby-my-name')).toHaveText(`내 이름: ${name}`);
   return page;
+}
+
+/** Creates a room from the lobby and returns its invitation URL. */
+export async function openRoom(page: Page, name = 'E2E 방'): Promise<string> {
+  await page.fill('#room-name', name);
+  await page.click('#create-room button[type=submit]');
+  await expect(page).toHaveURL(/[?]room=/);
+  await expect(page.locator('#room-title')).toHaveText(name);
+  await expect(page.locator('#seat-take')).toBeVisible();
+  return page.url();
+}
+
+/** Opens an invitation URL (the name is remembered, so no prompt). */
+export async function enterRoom(page: Page, url: string): Promise<void> {
+  await page.goto(url);
+  await expect(page.locator('#room-view')).toBeVisible();
+  await expect(page.locator('#status')).not.toHaveText('방에 들어가는 중…');
 }
 
 export const square = (page: Page, name: string) => page.locator(`.square[aria-label^="${name},"]`);
 
-/** Seats both players and returns them ordered as [white, black]. */
-export async function startGame(a: Page, b: Page): Promise<[Page, Page]> {
+/**
+ * Creates a room with `a`, brings `b` (and any spectators) in through the
+ * invitation link, seats both players and returns them as [white, black].
+ */
+export async function startGame(a: Page, b: Page, ...spectators: Page[]): Promise<[Page, Page]> {
+  const url = await openRoom(a);
+  for (const page of [b, ...spectators]) await enterRoom(page, url);
   await a.click('#seat-take');
   await expect(a.locator('#seat-leave')).toBeVisible();
   await b.click('#seat-take');

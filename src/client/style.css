@@ -542,3 +542,94 @@ dialog input {
   width: 56px;
   height: 56px;
 }
+
+/* -------------------------------------------------------------- lobby */
+
+.lobby {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 12px 20px;
+}
+
+.lobby[hidden],
+.layout[hidden],
+.room-bar[hidden],
+.captured[hidden] {
+  display: none;
+}
+
+.lobby-panel {
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.lobby-panel h2 {
+  margin: 0 0 12px;
+}
+
+.create-room {
+  display: flex;
+  gap: 8px;
+}
+
+.create-room input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  font-size: 16px;
+}
+
+.room-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.room-item {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.room-item-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.room-item-detail {
+  color: #444;
+}
+
+.room-item.playing .room-item-detail {
+  color: #0000d0;
+}
+
+.lobby-empty {
+  color: #333;
+}
+
+.room-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 780px;
+  margin: 0 auto 10px;
+  padding: 0 12px;
+}
+
+.room-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: white;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}

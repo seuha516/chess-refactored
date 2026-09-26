@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_FEN, parseSquare } from '../../src/shared/chess/index.ts';
 import type { GameSnapshot, PlayerInfo, RoomSnapshot } from '../../src/shared/protocol.ts';
-import { buildView, formatClock, type ClientState } from '../../src/client/view-model.ts';
+import {
+  buildView,
+  formatClock,
+  lobbyRows,
+  type ClientState,
+} from '../../src/client/view-model.ts';
 
-const alice: PlayerInfo = { id: 'alice', name: 'Alice', connected: true };
-const bob: PlayerInfo = { id: 'bob', name: 'Bob', connected: true };
+const alice: PlayerInfo = { id: 'alice', name: 'Alice', connected: true, disconnectedAt: null };
+const bob: PlayerInfo = { id: 'bob', name: 'Bob', connected: true, disconnectedAt: null };
+const AT = 5_000_000;
 
 function game(overrides: Partial<GameSnapshot> = {}): GameSnapshot {
   return {
-    id: 1,
+    id: 'g1',
     white: alice,
     black: bob,
     fen: INITIAL_FEN,
@@ -23,7 +29,16 @@ function game(overrides: Partial<GameSnapshot> = {}): GameSnapshot {
 }
 
 function state(me: string | null, room: Partial<RoomSnapshot>, extra: Partial<ClientState> = {}) {
-  const snapshot: RoomSnapshot = { seats: [], game: null, online: 2, ...room };
+  const snapshot: RoomSnapshot = {
+    id: 'r1',
+    name: 'Test',
+    seats: [],
+    game: null,
+    online: 2,
+    chat: [],
+    at: AT,
+    ...room,
+  };
   const base: ClientState = {
     session: me ? { token: 'x'.repeat(16), playerId: me, name: me } : null,
     room: snapshot,
@@ -119,7 +134,7 @@ describe('buildView', () => {
     });
     expect(buildView(state('bob', { game: finished(null) })).result?.title).toBe('무승부');
     expect(
-      buildView(state('bob', { game: finished('b') }, { dismissedResult: 1 })).result,
+      buildView(state('bob', { game: finished('b') }, { dismissedResult: 'g1' })).result,
     ).toBeNull();
   });
 
@@ -146,11 +161,6 @@ describe('buildView', () => {
       '상대가 무승부를 제안했습니다.',
     );
   });
-
-  it('warns when the player to move is disconnected', () => {
-    const view = buildView(state('bob', { game: game({ white: { ...alice, connected: false } }) }));
-    expect(view.status).toContain('Alice님의 연결이 끊겼습니다');
-  });
 });
 
 describe('formatClock', () => {
@@ -169,5 +179,36 @@ describe('formatClock', () => {
     expect(formatClock(50)).toBe('0:00.1');
     expect(formatClock(0)).toBe('0:00.0');
     expect(formatClock(-50)).toBe('0:00.0');
+  });
+});
+
+describe('time rules in the view', () => {
+  it('counts down a disconnected player and asks for a sync when due', () => {
+    const away = game({ black: { ...bob, connected: false, disconnectedAt: AT - 20_000 } });
+    const view = buildView(state('alice', { game: away }), AT);
+    expect(view.status).toContain(
+      'Bob님의 연결이 끊겼습니다. 40초 안에 돌아오지 않으면 기권패로 처리됩니다.',
+    );
+    expect(view.syncAt).toBe(AT + 40_000);
+  });
+
+  it('asks for a sync when the running clock runs out', () => {
+    const view = buildView(state('alice', { game: game() }), AT);
+    expect(view.syncAt).toBe(AT + 910_000);
+    expect(buildView(state('alice', { game: null }), AT).syncAt).toBeNull();
+  });
+});
+
+describe('lobbyRows', () => {
+  it('describes waiting and running rooms', () => {
+    expect(
+      lobbyRows({
+        rooms: [
+          { id: 'a', name: 'A', status: 'waiting', players: ['Alice'], createdAt: 1 },
+          { id: 'b', name: 'B', status: 'waiting', players: [], createdAt: 1 },
+          { id: 'c', name: 'C', status: 'playing', players: ['Alice', 'Bob'], createdAt: 1 },
+        ],
+      }).map((row) => row.detail),
+    ).toEqual(['대기 중 (1/2) · Alice', '대기 중 (0/2)', '대국 중 · Alice vs Bob']);
   });
 });

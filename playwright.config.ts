@@ -18,7 +18,8 @@ export default defineConfig({
   webServer: {
     command: 'npm run build && node src/server/index.ts',
     url: `http://localhost:${String(PORT)}`,
-    env: { PORT: String(PORT) },
+    // Every test browser connects from 127.0.0.1, so lift the per-address limit.
+    env: { PORT: String(PORT), CONNECTIONS_PER_MINUTE: '1000' },
     reuseExistingServer: false,
     timeout: 60_000,
   },

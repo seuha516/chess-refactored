@@ -21,7 +21,9 @@ export type EndReason =
   | 'resignation'
   | 'agreement'
   | 'timeout'
-  | 'timeout-vs-insufficient-material';
+  | 'timeout-vs-insufficient-material'
+  | 'disconnection'
+  | 'disconnection-vs-insufficient-material';
 
 export interface Outcome {
   /** null for a draw */
@@ -122,6 +124,19 @@ export class ChessGame {
       canCheckmate(this.#position.board, opponent)
         ? { winner: opponent, reason: 'timeout' }
         : { winner: null, reason: 'timeout-vs-insufficient-material' },
+    );
+  }
+
+  /**
+   * Online Regulations 11.4.2: a player who does not reconnect in time loses,
+   * unless the opponent cannot checkmate (then the game is drawn).
+   */
+  forfeitByDisconnection(color: Color): Outcome | null {
+    const opponent = opposite(color);
+    return this.#finish(
+      canCheckmate(this.#position.board, opponent)
+        ? { winner: opponent, reason: 'disconnection' }
+        : { winner: null, reason: 'disconnection-vs-insufficient-material' },
     );
   }
 
