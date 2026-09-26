@@ -1,4 +1,5 @@
-import { squareName, type PromotionPiece, type Square } from '../shared/chess/index.ts';
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+import { squareName, type Color, type PromotionPiece, type Square } from '../shared/chess/index.ts';
 import type { CreateRoomResult, LobbySnapshot, RoomSnapshot } from '../shared/protocol.ts';
 import { BoardView, pieceImage } from './board-view.ts';
 import { ChatView } from './chat-view.ts';
@@ -11,17 +12,22 @@ import {
   type RequestResult,
 } from './connection.ts';
 import { playSound } from './sounds.ts';
-import { ERROR_TEXT, PIECE_NAME } from './text.ts';
+import { COLOR_NAME, ERROR_TEXT, PIECE_NAME } from './text.ts';
 import {
   buildView,
   colorOf,
   formatClock,
   lobbyRows,
+  moveRowText,
   type ClientState,
+  type LobbyRow,
+  type SeatView,
   type ViewModel,
 } from './view-model.ts';
 
 const CLOCK_WARNING_MS = 30_000;
+const CONFIRM_TIMEOUT_MS = 6000;
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 function element<T extends HTMLElement>(id: string, type: abstract new () => T): T {
   const found = document.getElementById(id);
@@ -29,49 +35,90 @@ function element<T extends HTMLElement>(id: string, type: abstract new () => T):
   return found;
 }
 
+interface SeatElements {
+  readonly root: HTMLElement;
+  readonly name: HTMLElement;
+  readonly tag: HTMLElement;
+  readonly haul: HTMLElement;
+  readonly clock: HTMLElement;
+  readonly action: HTMLElement;
+}
+
+function seatElements(id: string): SeatElements {
+  const root = element(id, HTMLElement);
+  const part = (selector: string) => {
+    const found = root.querySelector<HTMLElement>(selector);
+    if (!found) throw new Error(`#${id} ${selector} is missing`);
+    return found;
+  };
+  return {
+    root,
+    name: part('.seat-name'),
+    tag: part('.seat-tag'),
+    haul: part('.seat-haul'),
+    clock: part('.clock'),
+    action: part('.seat-action'),
+  };
+}
+
 const dom = {
+  brand: element('brand', HTMLAnchorElement),
   lobbyView: element('lobby-view', HTMLElement),
   createRoom: element('create-room', HTMLFormElement),
   roomName: element('room-name', HTMLInputElement),
   lobbyStatus: element('lobby-status', HTMLElement),
   roomList: element('room-list', HTMLElement),
+  roomCount: element('room-count', HTMLElement),
   lobbyEmpty: element('lobby-empty', HTMLElement),
-  lobbyMyName: element('lobby-my-name', HTMLElement),
-  lobbyRename: element('lobby-rename', HTMLButtonElement),
   roomBar: element('room-bar', HTMLElement),
   roomTitle: element('room-title', HTMLElement),
+  roomMeta: element('room-meta', HTMLElement),
   backToLobby: element('back-to-lobby', HTMLButtonElement),
   copyLink: element('copy-link', HTMLButtonElement),
+  copyLinkLabel: element('copy-link-label', HTMLElement),
   roomView: element('room-view', HTMLElement),
-  captured: element('captured', HTMLElement),
+  seatTop: seatElements('seat-top'),
+  seatBottom: seatElements('seat-bottom'),
   board: element('board', HTMLElement),
+  stash: element('stash', HTMLElement),
+  rimRanks: element('rim-ranks', HTMLElement),
+  rimFiles: element('rim-files', HTMLElement),
   result: element('result', HTMLElement),
   resultTitle: element('result-title', HTMLElement),
   resultReason: element('result-reason', HTMLElement),
+  resultJoin: element('result-join', HTMLElement),
   resultClose: element('result-close', HTMLButtonElement),
-  clock1: element('clock-1', HTMLElement),
-  clock2: element('clock-2', HTMLElement),
   timeControl: element('time-control', HTMLElement),
   capturedWhite: element('captured-white', HTMLElement),
   capturedBlack: element('captured-black', HTMLElement),
   banner: element('connection-banner', HTMLElement),
-  player1: element('player-1', HTMLElement),
-  player2: element('player-2', HTMLElement),
   status: element('status', HTMLElement),
   moves: element('moves', HTMLElement),
+  moveCount: element('move-count', HTMLElement),
+  movesEmpty: element('moves-empty', HTMLElement),
   seatTake: element('seat-take', HTMLButtonElement),
   seatLeave: element('seat-leave', HTMLButtonElement),
   drawOffer: element('draw-offer', HTMLButtonElement),
+  drawOfferLabel: element('draw-offer-label', HTMLElement),
   drawAccept: element('draw-accept', HTMLButtonElement),
   drawDecline: element('draw-decline', HTMLButtonElement),
   resign: element('resign', HTMLButtonElement),
   flip: element('flip', HTMLButtonElement),
+  controls: element('controls', HTMLElement),
+  confirm: element('confirm', HTMLElement),
+  confirmText: element('confirm-text', HTMLElement),
+  confirmYes: element('confirm-yes', HTMLButtonElement),
+  confirmNo: element('confirm-no', HTMLButtonElement),
+  online: element('online', HTMLElement),
   chatLog: element('chat-log', HTMLElement),
   chatForm: element('chat-form', HTMLFormElement),
   chatInput: element('chat-input', HTMLInputElement),
   myName: element('my-name', HTMLElement),
   rename: element('rename', HTMLButtonElement),
   nameDialog: element('name-dialog', HTMLDialogElement),
+  nameDialogTitle: element('name-dialog-title', HTMLElement),
+  nameCancel: element('name-cancel', HTMLButtonElement),
+  nameOk: element('name-ok', HTMLButtonElement),
   nameInput: element('name-input', HTMLInputElement),
   promotionDialog: element('promotion-dialog', HTMLDialogElement),
   promotionChoices: element('promotion-choices', HTMLElement),
@@ -106,20 +153,27 @@ let clockWarnedFor = '';
 let lastSyncRequest = 0;
 let errorText: string | null = null;
 let errorTimer: ReturnType<typeof setTimeout> | undefined;
+/** A resignation or draw offer waiting for the second, confirming press. */
+let confirming: 'resign' | 'draw' | null = null;
+let confirmTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** Current server time, estimated from the last snapshot. */
 const serverNow = () => (state.room ? state.room.at + (performance.now() - snapshotAt) : 0);
 
 const socket = createSocket();
 const chat = new ChatView(dom.chatLog);
-const board = new BoardView(dom.board, {
-  activate: (square) => {
-    onSquare(square);
+const board = new BoardView(
+  dom.board,
+  {
+    activate: (square) => {
+      onSquare(square);
+    },
+    drop: (from, to) => {
+      void tryMove(from, to);
+    },
   },
-  drop: (from, to) => {
-    void tryMove(from, to);
-  },
-});
+  { ranks: dom.rimRanks, files: dom.rimFiles },
+);
 
 function update(patch: Partial<ClientState>): void {
   state = { ...state, ...patch };
@@ -147,6 +201,9 @@ function enterRoute(): void {
   if (route.kind === 'room') {
     if (state.room?.id !== route.roomId) {
       chat.replace([]);
+      setConfirming(null);
+      delete dom.seatTop.root.dataset.who;
+      delete dom.seatBottom.root.dataset.who;
       update({ room: null, selected: null, pending: false, flipped: false, dismissedResult: null });
     }
   }
@@ -275,7 +332,7 @@ async function tryMove(from: Square, to: Square): Promise<void> {
   report(result);
 }
 
-function choosePromotion(color: 'w' | 'b'): Promise<PromotionPiece | null> {
+function choosePromotion(color: Color): Promise<PromotionPiece | null> {
   const pieces: PromotionPiece[] = ['q', 'r', 'b', 'n'];
   dom.promotionChoices.replaceChildren(
     ...pieces.map((type) => {
@@ -285,8 +342,10 @@ function choosePromotion(color: 'w' | 'b'): Promise<PromotionPiece | null> {
       button.className = 'promotion-choice';
       const image = document.createElement('img');
       image.src = pieceImage({ color, type });
-      image.alt = PIECE_NAME[type];
-      button.append(image);
+      image.alt = '';
+      const label = document.createElement('span');
+      label.textContent = PIECE_NAME[type];
+      button.append(image, label);
       return button;
     }),
   );
@@ -321,6 +380,11 @@ const send = (event: Parameters<typeof request>[1], ...args: unknown[]) => {
   void request(socket, event, ...args).then(report);
 };
 
+dom.brand.addEventListener('click', (event) => {
+  event.preventDefault();
+  navigate({ kind: 'lobby' });
+});
+
 dom.createRoom.addEventListener('submit', (event) => {
   event.preventDefault();
   const name = dom.roomName.value.trim();
@@ -346,13 +410,19 @@ dom.backToLobby.addEventListener('click', () => {
   navigate({ kind: 'lobby' });
 });
 
+let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 dom.copyLink.addEventListener('click', () => {
   if (route.kind !== 'room') return;
   const url = roomUrl(route.roomId);
   navigator.clipboard.writeText(url).then(
     () => {
-      dom.copyLink.textContent = '복사했습니다!';
-      setTimeout(() => (dom.copyLink.textContent = '초대 링크 복사'), 2000);
+      dom.copyLinkLabel.textContent = '복사했습니다';
+      dom.copyLink.classList.add('done');
+      clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => {
+        dom.copyLinkLabel.textContent = '초대 링크 복사';
+        dom.copyLink.classList.remove('done');
+      }, 2000);
     },
     () => {
       window.prompt('이 링크를 친구에게 보내세요.', url);
@@ -366,23 +436,63 @@ dom.seatTake.addEventListener('click', () => {
 dom.seatLeave.addEventListener('click', () => {
   send('seat:leave');
 });
-dom.drawOffer.addEventListener('click', () => {
-  send('game:offer-draw');
-});
 dom.drawAccept.addEventListener('click', () => {
   send('game:accept-draw');
 });
 dom.drawDecline.addEventListener('click', () => {
   send('game:decline-draw');
 });
-dom.resign.addEventListener('click', () => {
-  if (window.confirm('정말 기권하시겠습니까?')) send('game:resign');
+
+/** Resigning and offering a draw take a second press on the confirm bar. */
+function setConfirming(next: typeof confirming): void {
+  confirming = next;
+  clearTimeout(confirmTimer);
+  if (next) {
+    confirmTimer = setTimeout(() => {
+      setConfirming(null);
+      render();
+    }, CONFIRM_TIMEOUT_MS);
+  }
+}
+
+dom.drawOffer.addEventListener('click', () => {
+  setConfirming('draw');
+  render();
+  dom.confirmYes.focus();
 });
+dom.resign.addEventListener('click', () => {
+  setConfirming('resign');
+  render();
+  dom.confirmYes.focus();
+});
+dom.confirmYes.addEventListener('click', () => {
+  const action = confirming;
+  setConfirming(null);
+  if (action === 'resign') send('game:resign');
+  if (action === 'draw') send('game:offer-draw');
+  render();
+});
+dom.confirmNo.addEventListener('click', () => {
+  const action = confirming;
+  setConfirming(null);
+  render();
+  (action === 'resign' ? dom.resign : dom.drawOffer).focus();
+});
+dom.confirm.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') dom.confirmNo.click();
+});
+
 dom.flip.addEventListener('click', () => {
   update({ flipped: !state.flipped });
 });
 dom.resultClose.addEventListener('click', () => {
   update({ dismissedResult: state.room?.game?.id ?? null });
+});
+dom.seatTake.addEventListener('click', () => {
+  // Joining from the result plaque also puts the plaque away.
+  if (dom.seatTake.parentElement === dom.resultJoin) {
+    update({ dismissedResult: state.room?.game?.id ?? null });
+  }
 });
 
 dom.chatForm.addEventListener('submit', (event) => {
@@ -394,13 +504,16 @@ dom.chatForm.addEventListener('submit', (event) => {
 });
 
 function openNameDialog(): void {
+  const firstVisit = !state.session;
+  dom.nameDialogTitle.textContent = firstVisit ? '대국에서 쓸 이름을 정해주세요' : '이름 바꾸기';
+  dom.nameOk.textContent = firstVisit ? '시작하기' : '바꾸기';
+  dom.nameCancel.textContent = firstVisit ? '익명으로 시작' : '취소';
   dom.nameInput.value = state.session?.name ?? savedName() ?? '';
   dom.nameDialog.returnValue = '';
   dom.nameDialog.showModal();
 }
 
 dom.rename.addEventListener('click', openNameDialog);
-dom.lobbyRename.addEventListener('click', openNameDialog);
 dom.nameDialog.addEventListener('close', () => {
   const name = dom.nameDialog.returnValue === 'ok' ? dom.nameInput.value.trim() : '';
   if (!state.session) {
@@ -421,13 +534,12 @@ dom.nameDialog.addEventListener('close', () => {
 
 function render(): void {
   const inRoom = route.kind === 'room';
+  document.body.dataset.route = inRoom ? 'room' : 'lobby';
   dom.lobbyView.hidden = inRoom;
   dom.roomView.hidden = !inRoom;
   dom.roomBar.hidden = !inRoom;
-  dom.captured.hidden = !inRoom;
-  const myName = state.session ? `내 이름: ${state.session.name}` : '';
-  dom.myName.textContent = myName;
-  dom.lobbyMyName.textContent = myName;
+  dom.myName.textContent = state.session?.name ?? '';
+  dom.rename.hidden = !state.session;
   if (inRoom) renderRoom();
   else renderLobby();
 }
@@ -439,29 +551,60 @@ function renderLobby(): void {
   dom.lobbyStatus.classList.toggle('error', errorText !== null);
   const rows = lobby ? lobbyRows(lobby) : [];
   dom.lobbyEmpty.hidden = !lobby || rows.length > 0;
-  dom.roomList.replaceChildren(
-    ...rows.map((row) => {
-      const item = document.createElement('li');
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = `room-item${row.playing ? ' playing' : ''}`;
-      button.dataset.room = row.id;
-      const name = document.createElement('span');
-      name.className = 'room-item-name';
-      name.textContent = row.name;
-      const detail = document.createElement('span');
-      detail.className = 'room-item-detail';
-      detail.textContent = row.detail;
-      button.append(name, detail);
-      item.append(button);
-      return item;
-    }),
-  );
+  dom.roomCount.textContent = rows.length ? `${String(rows.length)}개` : '';
+  dom.roomList.replaceChildren(...rows.map(lobbyTable));
+}
+
+/** A room in the lobby, drawn as a table seen from above with its two seats. */
+function lobbyTable(row: LobbyRow): HTMLElement {
+  const item = document.createElement('li');
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `room-item${row.playing ? ' playing' : ''}`;
+  button.dataset.room = row.id;
+
+  const top = document.createElement('span');
+  top.className = 'mini-table';
+  top.setAttribute('aria-hidden', 'true');
+  const [far, near] = row.seats;
+  top.append(miniSeat(far), miniBoard(), miniSeat(near));
+
+  const name = document.createElement('span');
+  name.className = 'room-item-name';
+  name.textContent = row.name;
+  const status = document.createElement('span');
+  status.className = 'room-item-status';
+  status.textContent = row.status;
+  const players = document.createElement('span');
+  players.className = 'room-item-players';
+  const seated = row.seats.filter((seat): seat is string => seat !== null);
+  players.textContent = seated.length ? seated.join(row.playing ? ' vs ' : ', ') : '빈 테이블';
+  const text = document.createElement('span');
+  text.className = 'room-item-text';
+  text.append(name, status, players);
+
+  button.append(top, text);
+  item.append(button);
+  return item;
+}
+
+function miniSeat(name: string | null): HTMLElement {
+  const seat = document.createElement('span');
+  seat.className = name ? 'mini-seat' : 'mini-seat empty';
+  seat.textContent = name ?? '빈 자리';
+  return seat;
+}
+
+function miniBoard(): HTMLElement {
+  const top = document.createElement('span');
+  top.className = 'mini-board';
+  return top;
 }
 
 function renderRoom(): void {
   const room = state.room;
   dom.roomTitle.textContent = room?.name ?? '';
+  dom.roomMeta.textContent = room ? `${String(room.online)}명 접속` : '';
   document.title = room ? `${room.name} - Chess` : 'Chess';
 
   board.render(view.board);
@@ -469,34 +612,57 @@ function renderRoom(): void {
   dom.board.dataset.ply = String(room?.game?.moves.length ?? 0);
   dom.board.dataset.status = room?.game?.status ?? 'none';
 
-  const [first, second] = view.players;
-  for (const [node, label] of [
-    [dom.player1, first],
-    [dom.player2, second],
-  ] as const) {
-    node.textContent = label ? label.text : '(대기중)';
-    node.classList.toggle('me', label?.me ?? false);
-    node.classList.toggle('offline', label ? !label.connected : false);
-    node.title = label && !label.connected ? '연결 끊김' : '';
-  }
+  renderSeat(dom.seatTop, view.seats.top);
+  renderSeat(dom.seatBottom, view.seats.bottom);
 
   dom.status.textContent = errorText ?? (room ? view.status : '방에 들어가는 중…');
   dom.status.classList.toggle('error', errorText !== null);
+  dom.status.classList.toggle(
+    'my-turn',
+    errorText === null && view.myColor !== null && view.board.movable.size > 0,
+  );
 
-  renderList(dom.moves, view.moveRows);
-  dom.moves.scrollTop = dom.moves.scrollHeight;
+  renderMoves();
   renderCaptured(dom.capturedWhite, 'w', view.captured.w);
   renderCaptured(dom.capturedBlack, 'b', view.captured.b);
+  dom.online.textContent = room ? `${String(room.online)}명` : '';
 
   const { controls } = view;
   dom.seatTake.hidden = !room || !controls.seatTake;
+  // Waiting alone at the table: the invitation is the thing to do next.
+  dom.copyLink.classList.toggle('invite', controls.seatLeave && (room?.seats.length ?? 0) < 2);
   dom.seatLeave.hidden = !controls.seatLeave;
-  dom.drawOffer.hidden = controls.draw === 'hidden' || controls.draw === 'respond';
+  const drawVisible = controls.draw === 'offer' || controls.draw === 'offered';
+  if (
+    (confirming === 'draw' && controls.draw !== 'offer') ||
+    (confirming === 'resign' && !controls.resign)
+  ) {
+    setConfirming(null);
+  }
+  dom.drawOffer.hidden = !drawVisible || confirming !== null;
   dom.drawOffer.disabled = controls.draw === 'offered';
-  dom.drawOffer.textContent = controls.draw === 'offered' ? '무승부 제안함' : '무승부 신청';
-  dom.drawAccept.hidden = controls.draw !== 'respond';
-  dom.drawDecline.hidden = controls.draw !== 'respond';
-  dom.resign.hidden = !controls.resign;
+  dom.drawOfferLabel.textContent = controls.draw === 'offered' ? '무승부 제안함' : '무승부 제안';
+  dom.drawAccept.hidden = controls.draw !== 'respond' || confirming !== null;
+  dom.drawDecline.hidden = controls.draw !== 'respond' || confirming !== null;
+  dom.resign.hidden = !controls.resign || confirming !== null;
+  dom.flip.hidden = confirming !== null;
+  dom.controls.classList.toggle('responding', controls.draw === 'respond');
+  dom.controls.classList.toggle(
+    'solo',
+    [...dom.controls.children].every(
+      (child) => child === dom.flip || (child as HTMLElement).hidden,
+    ),
+  );
+  dom.confirm.hidden = confirming === null;
+  if (confirming) {
+    dom.confirmText.textContent =
+      confirming === 'resign'
+        ? '정말 기권할까요? 이 대국은 패배로 끝납니다.'
+        : '상대에게 무승부를 제안할까요?';
+    dom.confirmYes.textContent = confirming === 'resign' ? '기권하기' : '제안하기';
+    dom.confirmYes.classList.toggle('danger', confirming === 'resign');
+    dom.confirmYes.classList.toggle('primary', confirming === 'draw');
+  }
 
   const result = view.result;
   dom.result.hidden = result === null;
@@ -505,22 +671,112 @@ function renderRoom(): void {
     dom.resultReason.textContent = result.reason;
     dom.result.dataset.tone = result.tone;
   }
+  // The join button sits on the free seat, or on the result plaque while it is shown,
+  // so there is only ever one of it.
+  const played = colorOf(room?.game ?? null, state.session?.playerId) !== null;
+  if (result && controls.seatTake) {
+    place(dom.resultJoin, dom.seatTake);
+    dom.seatTake.textContent = played ? '한 판 더' : '참가하기';
+  } else {
+    place(dom.resultJoin, null);
+    dom.seatTake.textContent = '참가';
+  }
   renderClock();
 }
 
-function renderList(list: HTMLElement, rows: readonly string[]): void {
+function renderSeat(seat: SeatElements, model: SeatView): void {
+  const player = model.player;
+  seat.root.dataset.color = model.color ?? '';
+  seat.root.dataset.state = player ? (player.connected ? 'seated' : 'away') : 'empty';
+  seat.root.classList.toggle('is-me', player?.me ?? false);
+  seat.name.textContent = player ? player.text : '빈 자리';
+  // Someone sitting down (or standing up) settles into the seat.
+  const who = player?.text ?? '';
+  if (state.room) {
+    if (
+      seat.root.dataset.who !== undefined &&
+      seat.root.dataset.who !== who &&
+      !reducedMotion.matches
+    ) {
+      seat.root.animate(
+        [
+          { opacity: 0, transform: 'translateY(6px)' },
+          { opacity: 1, transform: 'none' },
+        ],
+        { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.25, 1)' },
+      );
+    }
+    seat.root.dataset.who = who;
+  }
+  seat.name.title = player && !player.connected ? '연결 끊김' : '';
+  const tags: string[] = [];
+  if (player?.me) tags.push('나');
+  if (model.color) tags.push(COLOR_NAME[model.color]);
+  if (player && !player.connected) tags.push('연결 끊김');
+  if (!model.color && player && !model.action) tags.push('대기 중');
+  seat.tag.textContent = tags.join(' · ');
+
+  // The pieces this player has taken, and their material lead.
+  const haul =
+    model.color === 'w' ? dom.capturedBlack : model.color === 'b' ? dom.capturedWhite : null;
+  place(seat.haul, haul);
+  const lead = model.color ? view.material[model.color] : 0;
+  seat.haul.dataset.lead = lead ? `+${String(lead)}` : '';
+
+  const button =
+    model.action === 'take' ? dom.seatTake : model.action === 'leave' ? dom.seatLeave : null;
+  place(seat.action, button);
+}
+
+/** Makes `child` the only content of `slot`, returning what was there to the stash. */
+function place(slot: HTMLElement, child: HTMLElement | null): void {
+  for (const current of [...slot.children]) {
+    if (current !== child) dom.stash.append(current);
+  }
+  if (child && child.parentElement !== slot) slot.append(child);
+}
+
+/** The move sheet: "1. e4 e5" rows, the latest move marked. */
+function renderMoves(): void {
+  const rows = view.moveRows;
+  const list = dom.moves;
   while (list.childElementCount > rows.length) list.lastElementChild?.remove();
   rows.forEach((row, index) => {
-    let item = list.children[index];
+    let item = list.children[index] as HTMLElement | undefined;
     if (!item) {
       item = document.createElement('li');
       list.append(item);
     }
-    if (item.textContent !== row) item.textContent = row;
+    const key = moveRowText(row);
+    if (item.dataset.key === key) return;
+    item.dataset.key = key;
+    const number = document.createElement('span');
+    number.className = 'move-no';
+    number.textContent = `${String(row.number)}.`;
+    const white = document.createElement('span');
+    white.className = 'move';
+    white.textContent = row.white;
+    const parts: (Node | string)[] = [number, ' ', white];
+    if (row.black !== null) {
+      const black = document.createElement('span');
+      black.className = 'move';
+      black.textContent = row.black;
+      parts.push(' ', black);
+    }
+    item.replaceChildren(...parts);
   });
+  list.querySelector('.latest')?.classList.remove('latest');
+  const moves = list.querySelectorAll('.move');
+  moves[moves.length - 1]?.classList.add('latest');
+  const plies = state.room?.game?.moves.length ?? 0;
+  dom.moveCount.textContent = plies ? `${String(plies)}수` : '';
+  dom.movesEmpty.hidden = rows.length > 0;
+  list.hidden = rows.length === 0;
+  list.scrollTop = list.scrollHeight;
+  list.scrollLeft = list.scrollWidth;
 }
 
-function renderCaptured(row: HTMLElement, color: 'w' | 'b', pieces: readonly string[]): void {
+function renderCaptured(row: HTMLElement, color: Color, pieces: readonly string[]): void {
   const key = pieces.join('');
   if (row.dataset.key === key) return;
   row.dataset.key = key;
@@ -534,32 +790,31 @@ function renderCaptured(row: HTMLElement, color: 'w' | 'b', pieces: readonly str
   );
 }
 
-/** Clocks under the player names: white left, black right (as in `view.players`). */
+/** The clock on each seat, counting down locally between snapshots. */
 function renderClock(): void {
   const clock = view.clock;
   const game = state.room?.game;
   dom.timeControl.hidden = !game;
   if (game) {
     const { initialMs, incrementMs } = game.timeControl;
-    dom.timeControl.textContent = `${String(initialMs / 60_000)}분 + ${String(incrementMs / 1000)}초 (수마다 추가)`;
+    dom.timeControl.textContent = `${String(initialMs / 60_000)}분 + 수마다 ${String(incrementMs / 1000)}초`;
   }
-  const sides = [
-    [dom.clock1, 'w'],
-    [dom.clock2, 'b'],
-  ] as const;
-  for (const [node, color] of sides) {
-    node.hidden = clock === null;
-    if (!clock) continue;
+  for (const [seat, model] of [
+    [dom.seatTop, view.seats.top],
+    [dom.seatBottom, view.seats.bottom],
+  ] as const) {
+    const node = seat.clock;
+    const color = model.color;
+    node.hidden = clock === null || color === null;
+    seat.root.classList.toggle('running', clock?.running === color && color !== null);
+    if (!clock || !color) continue;
     const stored = color === 'w' ? clock.whiteMs : clock.blackMs;
     const running = clock.running === color;
     const left = running ? stored - (performance.now() - snapshotAt) : stored;
-    node.textContent = formatClock(left);
-    node.classList.toggle('running', running);
+    const text = formatClock(left);
+    if (node.textContent !== text) node.textContent = text;
     node.classList.toggle('low', left <= CLOCK_WARNING_MS);
-    node.setAttribute(
-      'aria-label',
-      `${color === 'w' ? '백' : '흑'} 남은 시간 ${formatClock(left)}`,
-    );
+    node.setAttribute('aria-label', `${COLOR_NAME[color]} 남은 시간 ${text}`);
 
     // Warn once per game when the player's own time gets low.
     const key = `${String(game?.id)}:${color}`;

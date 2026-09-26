@@ -11,6 +11,8 @@
 - 시간 제도는 **15분 + 수마다 10초 추가**(피셔 방식, FIDE 세계 래피드 선수권과 동일). 무승부 제안/수락/거절, 기권, 채팅,
   관전, 새로고침·재접속 시 자리 유지.
 - 클릭·키보드·드래그(터치 포함)로 수를 둘 수 있고, 휴대폰 화면에서도 사용할 수 있습니다.
+- 화면은 공원의 돌 체스 테이블을 모티프로 합니다. 판 위·아래 좌석에 이름·시계·잡은 기물이 붙고, 빈 좌석에서
+  바로 참가합니다. 제품 기준은 [PRODUCT.md](PRODUCT.md), 디자인 시스템은 [DESIGN.md](DESIGN.md)에 있습니다.
 
 ## 빠른 시작
 
@@ -73,7 +75,7 @@ src/
   shared/protocol.ts  Socket.IO 이벤트·스냅샷 타입
   server/          GameRoom(대국 상태), Socket.IO/Express 연결, 입력 검증, 요청 제한
   client/          Vite로 빌드하는 브라우저 클라이언트 (프레임워크 없는 TypeScript)
-public/            기물 이미지, 효과음 (원본 에셋)
+public/            기물 SVG(이 프로젝트용으로 새로 그림), 테이블 질감, 파비콘, 효과음(원본 에셋)
 test/              chess · server · client 단위/통합 테스트, e2e 브라우저 테스트
 docs/              설계 문서
 ```
@@ -85,5 +87,6 @@ docs/              설계 문서
 ## 기술 스택
 
 TypeScript 6 · Node.js(타입 스트리핑으로 직접 실행) · Express 5 · Socket.IO 4 · Redis(ioredis, Upstash) · Vite 8 ·
-Vitest 5 · Playwright · ESLint(typescript-eslint) · Prettier.
+Vitest 5 · Playwright · ESLint(typescript-eslint) · Prettier. 글꼴은 [Pretendard](https://github.com/orioncactus/pretendard)(SIL OFL 1.1)를
+npm 패키지에서 번들해 자체 호스팅합니다.
 [chess.js](https://github.com/jhlywa/chess.js)는 규칙 엔진 교차 검증용 개발 의존성으로만 사용합니다.

@@ -15,7 +15,7 @@ export async function join(
   await expect(page.locator('#name-dialog')).toBeVisible();
   await page.fill('#name-input', name);
   await page.click('#name-dialog button[value=ok]');
-  await expect(page.locator('#lobby-my-name')).toHaveText(`내 이름: ${name}`);
+  await expect(page.locator('#my-name')).toHaveText(name);
   return page;
 }
 
@@ -73,15 +73,15 @@ export async function playMoves(white: Page, black: Page, moves: string[]): Prom
 
 /** Ends a game still in progress so the next test finds a free table. */
 export async function resign(page: Page): Promise<void> {
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.click('#resign');
+  await expect(page.locator('#confirm-text')).toContainText('기권');
+  await page.click('#confirm-yes');
   await expect(page.locator('#board')).toHaveAttribute('data-status', 'finished');
 }
 
 /** The name a page joined with. */
 export async function nameOf(page: Page): Promise<string> {
-  const text = (await page.locator('#my-name').textContent()) ?? '';
-  return text.replace('내 이름: ', '');
+  return (await page.locator('#my-name').textContent()) ?? '';
 }
 
 /**
@@ -93,8 +93,8 @@ export async function cleanUp(): Promise<void> {
     // Buttons may disappear between the check and the click when a server
     // update arrives (e.g. the test already left the seat), so never wait long.
     if (await page.locator('#resign').isVisible()) {
-      page.once('dialog', (dialog) => void dialog.accept());
       await page.click('#resign', { timeout: 2000 }).catch(() => undefined);
+      await page.click('#confirm-yes', { timeout: 2000 }).catch(() => undefined);
     }
     if (await page.locator('#seat-leave').isVisible()) {
       await page.click('#seat-leave', { timeout: 2000 }).catch(() => undefined);

@@ -28,6 +28,8 @@ import { COLOR_NAME, END_REASON } from './text.ts';
 
 export interface BoardModel {
   readonly board: Board;
+  /** Moves played so far. */
+  readonly ply: number;
   /** Colour shown at the bottom. */
   readonly orientation: Color;
   readonly lastMove: { readonly from: Square; readonly to: Square } | null;
@@ -60,14 +62,32 @@ export interface PlayerLabel {
 
 export type DrawControl = 'hidden' | 'offer' | 'offered' | 'respond';
 
+/** One edge of the table: who sits there and what can be done with the seat. */
+export interface SeatView {
+  readonly player: PlayerLabel | null;
+  /** Piece colour while a game is played; null for a waiting seat. */
+  readonly color: Color | null;
+  /** The join or leave button belongs to this seat. */
+  readonly action: 'take' | 'leave' | null;
+}
+
+export interface MoveRow {
+  readonly number: number;
+  readonly white: string;
+  readonly black: string | null;
+}
+
 export interface ViewModel {
   readonly myColor: Color | null;
   readonly board: BoardModel;
-  readonly players: readonly [PlayerLabel | null, PlayerLabel | null];
+  /** The far edge of the table and the near one (the viewer's side). */
+  readonly seats: { readonly top: SeatView; readonly bottom: SeatView };
   readonly status: string;
-  readonly moveRows: readonly string[];
+  readonly moveRows: readonly MoveRow[];
   /** Pieces of each colour that have been captured, in the original display order. */
   readonly captured: Readonly<Record<Color, readonly PieceType[]>>;
+  /** Material lead of each colour, in pawns (0 for the side that is level or behind). */
+  readonly material: Readonly<Record<Color, number>>;
   readonly controls: {
     readonly seatTake: boolean;
     readonly seatLeave: boolean;
@@ -102,11 +122,51 @@ export function colorOf(game: GameSnapshot | null, playerId: string | undefined)
   return null;
 }
 
-const playerLabel = (player: PlayerInfo, me: string | undefined, suffix = ''): PlayerLabel => ({
-  text: `${player.name}${suffix}`,
+const playerLabel = (player: PlayerInfo, me: string | undefined): PlayerLabel => ({
+  text: player.name,
   connected: player.connected,
   me: player.id === me,
 });
+
+/** During a game each player sits on their colour's side of the board. */
+function gameSeats(
+  game: GameSnapshot,
+  me: string | undefined,
+  orientation: Color,
+): ViewModel['seats'] {
+  const seat = (color: Color): SeatView => ({
+    player: playerLabel(color === 'w' ? game.white : game.black, me),
+    color,
+    action: null,
+  });
+  return { top: seat(opposite(orientation)), bottom: seat(orientation) };
+}
+
+/**
+ * Before a game the viewer's own seat is the near edge. A viewer who is not
+ * seated finds the free seat there, facing them, with the join button on it.
+ */
+function waitingSeats(
+  seats: readonly PlayerInfo[],
+  me: string | undefined,
+  seatTake: boolean,
+  flipped: boolean,
+): ViewModel['seats'] {
+  const mine = seats.find((seat) => seat.id === me);
+  const others = seats.filter((seat) => seat !== mine);
+  const seat = (player: PlayerInfo | undefined, action: SeatView['action']): SeatView => ({
+    player: player ? playerLabel(player, me) : null,
+    color: null,
+    action,
+  });
+  const near = mine
+    ? seat(mine, 'leave')
+    : seatTake
+      ? seat(undefined, 'take')
+      : seat(others.shift(), null);
+  const far = seat(others[0], null);
+  return flipped ? { top: near, bottom: far } : { top: far, bottom: near };
+}
 
 /**
  * @param serverNow the current server time, estimated from the snapshot time
@@ -129,39 +189,41 @@ export function buildView(state: ClientState, serverNow: number = state.room?.at
   const lastMove = lastUci ? parseUci(lastUci) : null;
 
   const seatedMe = room?.seats.some((seat) => seat.id === me) ?? false;
-  const players: [PlayerLabel | null, PlayerLabel | null] = playing
-    ? [playerLabel(game.white, me, '(백)'), playerLabel(game.black, me, '(흑)')]
-    : [
-        room?.seats[0] ? playerLabel(room.seats[0], me) : null,
-        room?.seats[1] ? playerLabel(room.seats[1], me) : null,
-      ];
+  const seatTake = !playing && !seatedMe && (room?.seats.length ?? 0) < 2;
 
   // Players see their own colour at the bottom, spectators white; "flip" inverts it.
   const baseOrientation: Color = colorOf(game, me) ?? 'w';
+  const orientation = state.flipped ? opposite(baseOrientation) : baseOrientation;
+  const lost = captured(game);
+  const result = resultBanner(state, game, me);
 
   return {
     myColor,
     board: {
       board: position.board,
-      orientation: state.flipped ? opposite(baseOrientation) : baseOrientation,
+      ply: game?.moves.length ?? 0,
+      orientation,
       lastMove,
       check: game && isInCheck(position) ? findKing(position.board, position.turn) : null,
       selected: selected !== null && movable.has(selected) ? selected : null,
       targets,
       movable,
     },
-    players,
-    status: statusText(state, game, myColor, position, seatedMe, serverNow),
+    seats: playing
+      ? gameSeats(game, me, orientation)
+      : waitingSeats(room?.seats ?? [], me, seatTake, state.flipped),
+    status: statusText(state, game, myColor, position, seatedMe, serverNow, result),
     moveRows: moveRows(game),
-    captured: captured(game),
+    captured: lost,
+    material: material(lost),
     controls: {
-      seatTake: !playing && !seatedMe && (room?.seats.length ?? 0) < 2,
+      seatTake,
       seatLeave: !playing && seatedMe,
       draw: drawControl(game, myColor),
       resign: myColor !== null,
     },
     clock: playing ? game.clock : null,
-    result: resultBanner(state, game, me),
+    result,
     legalMoves: moves,
     syncAt: playing && room ? syncTime(game, room.at) : null,
   };
@@ -198,11 +260,15 @@ function statusText(
   position: Position,
   seatedMe: boolean,
   serverNow: number,
+  result: ViewModel['result'],
 ): string {
   if (!state.room) return '서버에 연결하는 중…';
   if (!game || game.status === 'finished') {
     const seats = state.room.seats.length;
     if (seatedMe) return `상대를 기다리는 중입니다. (${String(seats)}/2)`;
+    // While the result is shown, the referee line leads with it.
+    if (result)
+      return `${result.reason} ${result.title}. 다시 두려면 참가하세요. (${String(seats)}/2)`;
     return `참가 버튼을 눌러 대국에 참가하세요. (${String(seats)}/2)`;
   }
   const mover = position.turn === 'w' ? game.white : game.black;
@@ -228,15 +294,25 @@ function statusText(
   return parts.join(' ');
 }
 
-function moveRows(game: GameSnapshot | null): string[] {
-  const rows: string[] = [];
+function moveRows(game: GameSnapshot | null): MoveRow[] {
+  const rows: MoveRow[] = [];
   const moves = game?.moves ?? [];
   for (let i = 0; i < moves.length; i += 2) {
-    const white = moves[i]?.san ?? '';
-    const black = moves[i + 1]?.san;
-    rows.push(`${String(i / 2 + 1)}. ${white}${black ? ` ${black}` : ''}`);
+    rows.push({ number: i / 2 + 1, white: moves[i]?.san ?? '', black: moves[i + 1]?.san ?? null });
   }
   return rows;
+}
+
+/** A move row as text, e.g. "1. e4 e5". */
+export const moveRowText = (row: MoveRow): string =>
+  `${String(row.number)}. ${row.white}${row.black ? ` ${row.black}` : ''}`;
+
+const PIECE_VALUE: Readonly<Record<PieceType, number>> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+function material(lost: Record<Color, PieceType[]>): Record<Color, number> {
+  const total = (pieces: PieceType[]) => pieces.reduce((sum, type) => sum + PIECE_VALUE[type], 0);
+  const whiteLead = total(lost.b) - total(lost.w);
+  return { w: Math.max(0, whiteLead), b: Math.max(0, -whiteLead) };
 }
 
 function captured(game: GameSnapshot | null): Record<Color, PieceType[]> {
@@ -289,19 +365,24 @@ export function formatClock(ms: number): string {
 export interface LobbyRow {
   readonly id: string;
   readonly name: string;
-  readonly detail: string;
   readonly playing: boolean;
+  /** "대국 중" or "대기 중 (1/2)". */
+  readonly status: string;
+  /** Who sits at the far and the near edge of the table (white is near while playing). */
+  readonly seats: readonly [string | null, string | null];
 }
 
-/** One line per room for the lobby list. */
+/** One table per room for the lobby. */
 export function lobbyRows(lobby: LobbySnapshot): LobbyRow[] {
-  return lobby.rooms.map((room) => ({
-    id: room.id,
-    name: room.name,
-    playing: room.status === 'playing',
-    detail:
-      room.status === 'playing'
-        ? `대국 중 · ${room.players.join(' vs ')}`
-        : `대기 중 (${String(room.players.length)}/2)${room.players.length ? ` · ${room.players.join(', ')}` : ''}`,
-  }));
+  return lobby.rooms.map((room) => {
+    const [first = null, second = null] = room.players;
+    const playing = room.status === 'playing';
+    return {
+      id: room.id,
+      name: room.name,
+      playing,
+      status: playing ? '대국 중' : `대기 중 (${String(room.players.length)}/2)`,
+      seats: [second, first],
+    };
+  });
 }

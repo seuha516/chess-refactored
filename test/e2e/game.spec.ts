@@ -125,12 +125,16 @@ test('the board can be played with the keyboard', async ({ browser }) => {
 test('draw offers can be declined and accepted', async ({ browser }) => {
   const [white, black] = await startGame(await join(browser, 'Alice'), await join(browser, 'Bob'));
   await white.click('#draw-offer');
+  // Offering takes a second press, like resigning.
+  await expect(white.locator('#confirm-text')).toHaveText('상대에게 무승부를 제안할까요?');
+  await white.click('#confirm-yes');
   await expect(white.locator('#draw-offer')).toBeDisabled();
   await black.click('#draw-decline');
   await expect(white.locator('#chat-log')).toContainText('무승부 제안이 거절되었습니다.');
 
   await move(white, 'e2e4');
   await black.click('#draw-offer');
+  await black.click('#confirm-yes');
   await white.click('#draw-accept');
   await expect(black.locator('#result-title')).toHaveText('무승부');
   await expect(black.locator('#result-reason')).toHaveText('무승부 합의에 의해');
@@ -165,11 +169,14 @@ test('the lobby lists rooms and players can move between rooms', async ({ browse
   await alice.click('#seat-take');
 
   const entry = carol.locator('.room-item', { hasText: roomName });
-  await expect(entry).toContainText('대기 중 (1/2) · Alice');
+  await expect(entry).toContainText('대기 중 (1/2)');
+  await expect(entry).toContainText('Alice');
   await entry.click();
   await expect(carol).toHaveURL(url);
   await expect(carol.locator('#room-title')).toHaveText(roomName);
-  await expect(carol.locator('#player-1')).toHaveText('Alice');
+  // Carol is not seated: Alice sits across the table, the free seat faces Carol.
+  await expect(carol.locator('#seat-top .seat-name')).toHaveText('Alice');
+  await expect(carol.locator('#seat-bottom #seat-take')).toBeVisible();
 
   await carol.click('#back-to-lobby');
   await expect(carol.locator('#lobby-view')).toBeVisible();

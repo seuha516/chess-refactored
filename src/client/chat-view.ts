@@ -37,8 +37,13 @@ export class ChatView {
     } else {
       item.className = 'other';
       const author = document.createElement('strong');
-      author.textContent = `${message.author.name}: `;
-      item.append(author, message.text);
+      const separator = document.createElement('span');
+      separator.className = 'visually-hidden';
+      separator.textContent = ': ';
+      author.append(message.author.name, separator);
+      const text = document.createElement('span');
+      text.textContent = message.text;
+      item.append(author, text);
     }
     item.title = new Date(message.at).toLocaleTimeString();
     this.#list.append(item);

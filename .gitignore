@@ -5,3 +5,6 @@ coverage/
 test-results/
 playwright-report/
 .vercel/
+# Impeccable scratch output (review screenshots, decision-page answers)
+.impeccable/review/
+.impeccable/questions/

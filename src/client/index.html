@@ -2,35 +2,81 @@
 <html lang="ko">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="1대1 체스 웹 게임" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="링크 하나로 친구와 두는 1대1 체스" />
+    <meta name="theme-color" content="#d5d7d2" />
     <title>Chess</title>
-    <link rel="icon" href="/images/pieces/white_king.png" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./style.css" />
     <script type="module" src="./main.ts"></script>
   </head>
-  <body>
+  <body data-route="lobby">
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6" /></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24">
+        <path
+          d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1"
+        />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M6 21V4h11l-2.2 4L17 12H6" /></symbol>
+      <symbol id="i-draw" viewBox="0 0 24 24"><path d="M6 9.5h12M6 14.5h12" /></symbol>
+      <symbol id="i-flip" viewBox="0 0 24 24">
+        <path d="M8 20V4M4.5 7.5 8 4l3.5 3.5M16 4v16m-3.5-3.5L16 20l3.5-3.5" />
+      </symbol>
+      <symbol id="i-send" viewBox="0 0 24 24">
+        <path d="M20 4 4 11l6.5 2.5L13 20l7-16ZM10.5 13.5 20 4" />
+      </symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24">
+        <path d="M4 20h4L19 9l-4-4L4 16v4Zm9.5-13.5 4 4" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="i-people" viewBox="0 0 24 24">
+        <path
+          d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm-6 9a6 6 0 0 1 12 0m1-9a3 3 0 1 0-1.4-5.7M21 20a5 5 0 0 0-5-5"
+        />
+      </symbol>
+    </svg>
+
     <header class="topbar">
-      <h1 class="title">Chess</h1>
-      <div class="captured" id="captured" aria-label="잡힌 기물" hidden>
-        <div
-          class="captured-row captured-white"
-          id="captured-white"
-          aria-label="잡힌 백 기물"
-        ></div>
-        <div
-          class="captured-row captured-black"
-          id="captured-black"
-          aria-label="잡힌 흑 기물"
-        ></div>
+      <a class="brand" href="/" id="brand">
+        <img src="/favicon.svg" alt="" width="28" height="28" />
+        <span>Chess</span>
+      </a>
+      <div class="room-bar" id="room-bar" hidden>
+        <button type="button" class="button ghost icon-only-narrow" id="back-to-lobby">
+          <svg class="icon" aria-hidden="true"><use href="#i-back" /></svg>
+          <span class="label">로비</span>
+        </button>
+        <div class="plaque">
+          <h1 class="room-title" id="room-title"></h1>
+          <span class="room-meta" id="room-meta"></span>
+        </div>
+        <button type="button" class="button ghost icon-only-narrow" id="copy-link">
+          <svg class="icon" aria-hidden="true"><use href="#i-link" id="copy-link-icon" /></svg>
+          <span class="label" id="copy-link-label">초대 링크 복사</span>
+        </button>
+      </div>
+      <div class="me">
+        <span class="me-name" id="my-name"></span>
+        <button
+          type="button"
+          class="button ghost icon"
+          id="rename"
+          aria-label="이름 변경"
+          title="이름 변경"
+        >
+          <svg class="icon" aria-hidden="true"><use href="#i-edit" /></svg>
+        </button>
       </div>
     </header>
 
     <p class="connection-banner" id="connection-banner" role="status" hidden></p>
 
     <main class="lobby" id="lobby-view" hidden>
-      <section class="lobby-panel" aria-labelledby="lobby-title">
-        <h2 id="lobby-title">대국실</h2>
+      <section class="lobby-intro" aria-labelledby="lobby-title">
+        <h1 id="lobby-title">대국실</h1>
+        <p class="lead">방을 만들고 초대 링크를 보내면 친구와 바로 둘 수 있습니다.</p>
         <form class="create-room" id="create-room">
           <label class="visually-hidden" for="room-name">방 이름</label>
           <input
@@ -40,100 +86,163 @@
             autocomplete="off"
             placeholder="방 이름 (선택)"
           />
-          <button type="submit">방 만들기</button>
+          <button type="submit" class="button primary">
+            <svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>
+            방 만들기
+          </button>
         </form>
         <p class="status" id="lobby-status" role="status"></p>
-        <ul class="room-list" id="room-list" aria-label="방 목록"></ul>
+      </section>
+
+      <section class="tables" aria-labelledby="tables-title">
+        <div class="section-head">
+          <h2 id="tables-title">열린 방</h2>
+          <span class="count" id="room-count"></span>
+        </div>
+        <ul class="room-list" id="room-list" aria-labelledby="tables-title"></ul>
         <p class="lobby-empty" id="lobby-empty" hidden>
           아직 열린 방이 없습니다. 방을 만들고 초대 링크를 친구에게 보내 보세요.
         </p>
-        <p class="my-info">
-          <span id="lobby-my-name"></span>
-          <button type="button" class="link" id="lobby-rename">이름 변경</button>
-        </p>
       </section>
     </main>
 
-    <div class="room-bar" id="room-bar" hidden>
-      <button type="button" class="secondary" id="back-to-lobby">← 로비</button>
-      <h2 class="room-title" id="room-title"></h2>
-      <button type="button" class="secondary" id="copy-link">초대 링크 복사</button>
-    </div>
+    <main class="room" id="room-view" hidden>
+      <section class="board-col" aria-label="대국">
+        <div class="seat" id="seat-top">
+          <span class="puck" aria-hidden="true"></span>
+          <span class="seat-who">
+            <span class="seat-name"></span>
+            <span class="seat-tag"></span>
+          </span>
+          <span class="seat-haul"></span>
+          <span class="clock" role="timer" hidden></span>
+          <span class="seat-action"></span>
+        </div>
 
-    <main class="layout" id="room-view" hidden>
-      <section class="board-area" aria-label="체스판">
-        <div class="board" id="board" role="grid" aria-label="체스판"></div>
-        <div class="result" id="result" hidden>
-          <p class="result-title" id="result-title"></p>
-          <p class="result-reason" id="result-reason"></p>
-          <button type="button" class="result-close" id="result-close">닫기</button>
+        <div class="table" id="table">
+          <div class="rim-ranks" id="rim-ranks" aria-hidden="true"></div>
+          <div class="board" id="board" role="grid" aria-label="체스판"></div>
+          <div class="rim-files" id="rim-files" aria-hidden="true"></div>
+          <div class="result" id="result" hidden>
+            <p class="result-title" id="result-title"></p>
+            <p class="result-reason" id="result-reason"></p>
+            <div class="result-actions">
+              <span class="result-join" id="result-join"></span>
+              <button type="button" class="button" id="result-close">닫기</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="seat" id="seat-bottom">
+          <span class="puck" aria-hidden="true"></span>
+          <span class="seat-who">
+            <span class="seat-name"></span>
+            <span class="seat-tag"></span>
+          </span>
+          <span class="seat-haul"></span>
+          <span class="clock" role="timer" hidden></span>
+          <span class="seat-action"></span>
+        </div>
+
+        <!-- main.ts moves these into the seat they belong to, and back here when unused. -->
+        <div class="stash" id="stash" hidden>
+          <span class="captured" id="captured-white" aria-label="잡힌 백 기물"></span>
+          <span class="captured" id="captured-black" aria-label="잡힌 흑 기물"></span>
+          <button type="button" class="button primary" id="seat-take" hidden>참가</button>
+          <button type="button" class="button" id="seat-leave" hidden>일어나기</button>
         </div>
       </section>
 
-      <section class="panel" aria-label="대국 정보">
-        <div class="players">
-          <div class="player-box">
-            <span class="player player-1" id="player-1">(대기중)</span>
-            <span class="clock" id="clock-1" role="timer" hidden></span>
+      <section class="side" aria-label="대국 정보">
+        <div class="side-inner">
+          <div class="referee">
+            <p class="status" id="status" role="status"></p>
+            <p class="time-control" id="time-control" hidden></p>
+            <div class="controls" id="controls">
+              <button type="button" class="button" id="draw-offer" hidden>
+                <svg class="icon" aria-hidden="true"><use href="#i-draw" /></svg>
+                <span id="draw-offer-label">무승부 제안</span>
+              </button>
+              <button type="button" class="button primary" id="draw-accept" hidden>
+                무승부 수락
+              </button>
+              <button type="button" class="button" id="draw-decline" hidden>거절</button>
+              <button type="button" class="button" id="resign" hidden>
+                <svg class="icon" aria-hidden="true"><use href="#i-flag" /></svg>
+                기권
+              </button>
+              <button type="button" class="button ghost" id="flip">
+                <svg class="icon" aria-hidden="true"><use href="#i-flip" /></svg>
+                판 뒤집기
+              </button>
+            </div>
+            <div class="confirm" id="confirm" hidden>
+              <p class="confirm-text" id="confirm-text"></p>
+              <div class="confirm-actions">
+                <button type="button" class="button danger" id="confirm-yes"></button>
+                <button type="button" class="button" id="confirm-no">취소</button>
+              </div>
+            </div>
           </div>
-          <span class="vs">VS</span>
-          <div class="player-box">
-            <span class="player player-2" id="player-2">(대기중)</span>
-            <span class="clock" id="clock-2" role="timer" hidden></span>
-          </div>
-        </div>
-        <p class="time-control" id="time-control" hidden></p>
-        <p class="status" id="status" role="status"></p>
-        <ol class="moves" id="moves" aria-label="기보"></ol>
-        <div class="controls">
-          <button type="button" id="seat-take" hidden>참가</button>
-          <button type="button" id="seat-leave" hidden>취소</button>
-          <button type="button" id="draw-offer" hidden>무승부 신청</button>
-          <button type="button" id="draw-accept" hidden>무승부 수락</button>
-          <button type="button" id="draw-decline" hidden>거절</button>
-          <button type="button" id="resign" hidden>기권</button>
-          <button type="button" id="flip" class="secondary">판 뒤집기</button>
-        </div>
-      </section>
 
-      <section class="chat" aria-label="채팅">
-        <ul class="chat-log" id="chat-log" aria-live="polite"></ul>
-        <form class="chat-form" id="chat-form">
-          <label class="visually-hidden" for="chat-input">메시지</label>
-          <input
-            id="chat-input"
-            type="text"
-            maxlength="200"
-            autocomplete="off"
-            placeholder="메시지를 입력해주세요.."
-          />
-          <button type="submit">전송</button>
-        </form>
-        <p class="my-info">
-          <span id="my-name"></span>
-          <button type="button" class="link" id="rename">이름 변경</button>
-        </p>
+          <section class="sheet" aria-labelledby="moves-title">
+            <div class="section-head">
+              <h2 id="moves-title">기보</h2>
+              <span class="count" id="move-count"></span>
+            </div>
+            <ol class="moves" id="moves" aria-labelledby="moves-title"></ol>
+            <p class="moves-empty" id="moves-empty">첫 수를 기다리고 있습니다.</p>
+          </section>
+
+          <section class="chat" aria-labelledby="chat-title">
+            <div class="section-head">
+              <h2 id="chat-title">채팅</h2>
+              <span class="count" id="online"></span>
+            </div>
+            <ul class="chat-log" id="chat-log" aria-live="polite"></ul>
+            <form class="chat-form" id="chat-form">
+              <label class="visually-hidden" for="chat-input">메시지</label>
+              <input
+                id="chat-input"
+                type="text"
+                maxlength="200"
+                autocomplete="off"
+                placeholder="메시지 보내기"
+              />
+              <button type="submit" class="button icon" aria-label="전송" title="전송">
+                <svg class="icon" aria-hidden="true"><use href="#i-send" /></svg>
+              </button>
+            </form>
+          </section>
+        </div>
       </section>
     </main>
 
-    <dialog id="name-dialog" aria-labelledby="name-dialog-title">
+    <dialog
+      id="name-dialog"
+      aria-labelledby="name-dialog-title"
+      aria-describedby="name-dialog-hint"
+    >
       <form method="dialog" id="name-form">
-        <h2 id="name-dialog-title">사용할 닉네임을 입력해주세요.</h2>
+        <h2 id="name-dialog-title">대국에서 쓸 이름을 정해주세요</h2>
+        <label class="visually-hidden" for="name-input">이름</label>
         <input id="name-input" type="text" maxlength="16" autocomplete="nickname" required />
-        <p class="hint">1~16자. 비워두면 익명으로 참가합니다.</p>
+        <p class="hint" id="name-dialog-hint">1~16자. 상대와 관전자에게 이 이름이 보입니다.</p>
         <div class="dialog-actions">
-          <button type="submit" value="ok">확인</button>
-          <button type="submit" value="cancel" formnovalidate class="secondary">취소</button>
+          <button type="submit" value="cancel" formnovalidate class="button ghost" id="name-cancel">
+            취소
+          </button>
+          <button type="submit" value="ok" class="button primary" id="name-ok">확인</button>
         </div>
       </form>
     </dialog>
 
     <dialog id="promotion-dialog" aria-labelledby="promotion-dialog-title">
       <form method="dialog">
-        <h2 id="promotion-dialog-title">승진할 기물을 고르세요</h2>
+        <h2 id="promotion-dialog-title">어떤 기물로 승진할까요?</h2>
         <div class="promotion-choices" id="promotion-choices"></div>
         <div class="dialog-actions">
-          <button type="submit" value="cancel" class="secondary">취소</button>
+          <button type="submit" value="cancel" class="button ghost">취소</button>
         </div>
       </form>
     </dialog>

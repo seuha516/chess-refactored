@@ -17,6 +17,12 @@ export interface BoardHandlers {
   drop(from: Square, to: Square): void;
 }
 
+/** Where the coordinates engraved on the table rim go. */
+export interface BoardRim {
+  readonly ranks: HTMLElement;
+  readonly files: HTMLElement;
+}
+
 const PIECE_FILE: Record<Piece['type'], string> = {
   p: 'pawn',
   n: 'knight',
@@ -27,9 +33,11 @@ const PIECE_FILE: Record<Piece['type'], string> = {
 };
 
 export const pieceImage = (piece: Piece): string =>
-  `/images/pieces/${piece.color === 'w' ? 'white' : 'black'}_${PIECE_FILE[piece.type]}.png`;
+  `/images/pieces/${piece.color === 'w' ? 'white' : 'black'}_${PIECE_FILE[piece.type]}.svg`;
 
 const DRAG_THRESHOLD_PX = 4;
+const SLIDE_MS = 190;
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 /**
  * Renders the board as a grid of buttons. Moves can be made by clicking (or
@@ -40,6 +48,7 @@ const DRAG_THRESHOLD_PX = 4;
  */
 export class BoardView {
   readonly #root: HTMLElement;
+  readonly #rim: BoardRim | null;
   readonly #handlers: BoardHandlers;
   readonly #squares = new Map<Square, HTMLButtonElement>();
   #model: BoardModel | null = null;
@@ -50,11 +59,15 @@ export class BoardView {
     startX: number;
     startY: number;
     ghost: HTMLImageElement | null;
+    over: Square | null;
   } | null = null;
   #suppressClick = false;
+  /** A move dropped by drag is already where it belongs; do not slide it. */
+  #dropped: { from: Square; to: Square } | null = null;
 
-  constructor(root: HTMLElement, handlers: BoardHandlers) {
+  constructor(root: HTMLElement, handlers: BoardHandlers, rim: BoardRim | null = null) {
     this.#root = root;
+    this.#rim = rim;
     this.#handlers = handlers;
     for (let square = 0; square < 64; square++) {
       const button = document.createElement('button');
@@ -74,10 +87,15 @@ export class BoardView {
   }
 
   render(model: BoardModel): void {
-    const orientationChanged = this.#model?.orientation !== model.orientation;
+    const previous = this.#model;
+    const orientationChanged = previous?.orientation !== model.orientation;
     this.#model = model;
     if (orientationChanged) this.#layout(model.orientation);
     for (const [square, button] of this.#squares) this.#renderSquare(square, button, model);
+    if (previous && model.ply !== previous.ply) {
+      if (!orientationChanged && model.ply === previous.ply + 1) this.#slide(model);
+      this.#dropped = null;
+    }
   }
 
   /** Places the 64 buttons in rows for the given orientation, with coordinates. */
@@ -94,6 +112,7 @@ export class BoardView {
         button.querySelectorAll('.coord').forEach((label) => {
           label.remove();
         });
+        // Small in-square coordinates, shown where the board has no rim.
         if (column === 0) button.append(coordinate('rank', String(rankOf(square) + 1)));
         if (row === 7) button.append(coordinate('file', squareName(square).charAt(0)));
         rowElement.append(button);
@@ -101,6 +120,16 @@ export class BoardView {
       rows.push(rowElement);
     }
     this.#root.replaceChildren(...rows);
+    if (this.#rim) {
+      const files = 'abcdefgh'.split('');
+      const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
+      if (orientation === 'b') {
+        files.reverse();
+        ranks.reverse();
+      }
+      this.#rim.files.replaceChildren(...files.map((text) => rimLabel(text)));
+      this.#rim.ranks.replaceChildren(...ranks.map((text) => rimLabel(text)));
+    }
     this.#updateTabStop();
   }
 
@@ -145,6 +174,44 @@ export class BoardView {
     if (isTarget) parts.push('이동 가능');
     if (model.check === square) parts.push('체크');
     button.setAttribute('aria-label', parts.join(', '));
+  }
+
+  /** Slides the piece of the last move (and the rook of a castling) into place. */
+  #slide(model: BoardModel): void {
+    const move = model.lastMove;
+    if (!move || reducedMotion.matches) return;
+    if (this.#dropped?.from === move.from && this.#dropped.to === move.to) return;
+    const paths: [Square, Square][] = [[move.from, move.to]];
+    const piece = model.board[move.to];
+    const fileStep = fileOf(move.to) - fileOf(move.from);
+    if (piece?.type === 'k' && Math.abs(fileStep) === 2) {
+      const rank = rankOf(move.to);
+      const rookFrom = makeSquare(fileStep > 0 ? 7 : 0, rank);
+      const rookTo = makeSquare(fileOf(move.to) - Math.sign(fileStep), rank);
+      if (rookFrom !== null && rookTo !== null) paths.push([rookFrom, rookTo]);
+    }
+    for (const [from, to] of paths) {
+      const start = this.#squares.get(from)?.getBoundingClientRect();
+      const end = this.#squares.get(to);
+      const image = end?.querySelector<HTMLImageElement>('img.piece');
+      if (!start || !end || !image) continue;
+      const box = end.getBoundingClientRect();
+      const dx = start.left - box.left;
+      const dy = start.top - box.top;
+      end.classList.add('arriving');
+      image
+        .animate(
+          [{ transform: `translate(${String(dx)}px, ${String(dy)}px)` }, { transform: 'none' }],
+          {
+            duration: SLIDE_MS,
+            easing: 'cubic-bezier(0.2, 0.8, 0.25, 1)',
+          },
+        )
+        .finished.catch(() => undefined)
+        .finally(() => {
+          end.classList.remove('arriving');
+        });
+    }
   }
 
   #updateTabStop(): void {
@@ -201,6 +268,7 @@ export class BoardView {
       startX: event.clientX,
       startY: event.clientY,
       ghost: null,
+      over: null,
     };
   };
 
@@ -225,6 +293,12 @@ export class BoardView {
       this.#root.setPointerCapture(event.pointerId);
     }
     drag.ghost.style.transform = `translate(${String(event.clientX)}px, ${String(event.clientY)}px)`;
+    const over = this.#squareFromEvent(document.elementFromPoint(event.clientX, event.clientY));
+    if (over !== drag.over) {
+      if (drag.over !== null) this.#squares.get(drag.over)?.classList.remove('drop-hover');
+      drag.over = over;
+      if (over !== null) this.#squares.get(over)?.classList.add('drop-hover');
+    }
   };
 
   #onPointerUp = (event: PointerEvent): void => {
@@ -237,7 +311,10 @@ export class BoardView {
     this.#suppressClick = true;
     setTimeout(() => (this.#suppressClick = false), 0);
     const target = this.#squareFromEvent(document.elementFromPoint(event.clientX, event.clientY));
-    if (target !== null && target !== drag.from) this.#handlers.drop(drag.from, target);
+    if (target !== null && target !== drag.from) {
+      this.#dropped = { from: drag.from, to: target };
+      this.#handlers.drop(drag.from, target);
+    }
   };
 
   #cancelDrag = (): void => {
@@ -245,6 +322,7 @@ export class BoardView {
     if (!drag) return;
     drag.ghost?.remove();
     this.#squares.get(drag.from)?.classList.remove('dragging');
+    if (drag.over !== null) this.#squares.get(drag.over)?.classList.remove('drop-hover');
     if (this.#root.hasPointerCapture(drag.pointerId)) {
       this.#root.releasePointerCapture(drag.pointerId);
     }
@@ -257,5 +335,11 @@ function coordinate(kind: 'rank' | 'file', text: string): HTMLElement {
   label.className = `coord coord-${kind}`;
   label.textContent = text;
   label.setAttribute('aria-hidden', 'true');
+  return label;
+}
+
+function rimLabel(text: string): HTMLElement {
+  const label = document.createElement('span');
+  label.textContent = text;
   return label;
 }
