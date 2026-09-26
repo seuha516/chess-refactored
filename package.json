@@ -1,6 +1,6 @@
 {
   "name": "chess-refactored",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "description": "1대1 체스 웹 애플리케이션",
   "type": "module",
