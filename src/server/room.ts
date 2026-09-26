@@ -9,8 +9,17 @@ import {
   type Outcome,
 } from '../shared/chess/index.ts';
 import {
+  flagTime,
+  pressClock,
+  remainingMs,
+  startClock,
+  stopClock,
+  TIME_CONTROL,
+  type ClockState,
+  type TimeControl,
+} from '../shared/clock.ts';
+import {
   CHAT_HISTORY_SIZE,
-  MOVE_TIME_LIMIT_MS,
   SEAT_RECONNECT_GRACE_MS,
   type AckResult,
   type ChatMessage,
@@ -29,7 +38,7 @@ export interface RoomListener {
 }
 
 export interface RoomOptions {
-  readonly moveTimeLimitMs?: number;
+  readonly timeControl?: TimeControl;
   readonly seatGraceMs?: number;
   /** How long a disconnected, idle player is remembered (for reloads). */
   readonly idleGraceMs?: number;
@@ -49,7 +58,7 @@ interface ActiveGame {
   readonly id: number;
   readonly chess: ChessGame;
   readonly players: Readonly<Record<Color, Player>>;
-  deadline: number | null;
+  clock: ClockState;
   timer: ReturnType<typeof setTimeout> | null;
   drawOffer: Color | null;
   /** Ply at which each colour last offered a draw (one offer per move). */
@@ -75,13 +84,13 @@ const REASON_TEXT: Record<EndReason, string> = {
 
 /**
  * The single game table of the server: lobby seats, the authoritative game,
- * its per-move clock, draw offers, sessions and chat. It does not know about
+ * its Fischer clock, draw offers, sessions and chat. It does not know about
  * Socket.IO; the transport calls these methods with already-parsed input and
  * forwards what the listener receives.
  */
 export class GameRoom {
   readonly #listener: RoomListener;
-  readonly #moveTimeLimitMs: number;
+  readonly #timeControl: TimeControl;
   readonly #seatGraceMs: number;
   readonly #idleGraceMs: number;
   readonly #random: () => number;
@@ -95,7 +104,7 @@ export class GameRoom {
 
   constructor(listener: RoomListener, options: RoomOptions = {}) {
     this.#listener = listener;
-    this.#moveTimeLimitMs = options.moveTimeLimitMs ?? MOVE_TIME_LIMIT_MS;
+    this.#timeControl = options.timeControl ?? TIME_CONTROL;
     this.#seatGraceMs = options.seatGraceMs ?? SEAT_RECONNECT_GRACE_MS;
     this.#idleGraceMs = options.idleGraceMs ?? SEAT_RECONNECT_GRACE_MS;
     this.#random = options.random ?? Math.random;
@@ -197,7 +206,7 @@ export class GameRoom {
     }
     const outcome = game.chess.outcome;
     if (outcome) this.#finish(game, outcome);
-    else this.#startClock(game);
+    else this.#pressClock(game);
     this.#changed();
     return OK;
   }
@@ -301,23 +310,32 @@ export class GameRoom {
       id: this.#nextGameId++,
       chess: new ChessGame(),
       players: { w: white, b: black },
-      deadline: null,
+      clock: startClock(this.#timeControl, Date.now()),
       timer: null,
       drawOffer: null,
       lastOfferPly: { w: null, b: null },
     };
     this.#game = game;
     this.#system(`${white.name}(백)와 ${black.name}(흑)의 대결을 시작합니다.`);
-    this.#startClock(game);
+    this.#scheduleFlag(game);
   }
 
-  /** Starts the per-move clock for the side to move. */
-  #startClock(game: ActiveGame): void {
+  /** The mover's clock stops and the opponent's starts (with its increment). */
+  #pressClock(game: ActiveGame): void {
+    game.clock = pressClock(game.clock, this.#timeControl, Date.now());
+    this.#scheduleFlag(game);
+  }
+
+  /** Arms a timer for the moment the running side's time runs out. */
+  #scheduleFlag(game: ActiveGame): void {
     if (game.timer) clearTimeout(game.timer);
-    game.deadline = Date.now() + this.#moveTimeLimitMs;
-    game.timer = setTimeout(() => {
-      this.#timeout(game);
-    }, this.#moveTimeLimitMs);
+    const at = flagTime(game.clock);
+    game.timer =
+      at === null
+        ? null
+        : setTimeout(() => {
+            this.#timeout(game);
+          }, at - Date.now());
   }
 
   #timeout(game: ActiveGame): void {
@@ -328,16 +346,17 @@ export class GameRoom {
     }
   }
 
-  /** A move arriving after the deadline loses even if the timer has not fired yet. */
+  /** A move arriving after the flag fall loses even if the timer has not fired yet. */
   #enforceClock(): void {
     const game = this.#playingGame();
-    if (game && game.deadline !== null && Date.now() >= game.deadline) this.#timeout(game);
+    const at = game && flagTime(game.clock);
+    if (game && at !== null && Date.now() >= at) this.#timeout(game);
   }
 
   #finish(game: ActiveGame, outcome: Outcome): void {
     if (game.timer) clearTimeout(game.timer);
     game.timer = null;
-    game.deadline = null;
+    game.clock = stopClock(game.clock, Date.now());
     game.drawOffer = null;
     const winner = outcome.winner && game.players[outcome.winner];
     const reason = REASON_TEXT[outcome.reason];
@@ -405,7 +424,12 @@ export class GameRoom {
       })),
       status: chess.outcome ? 'finished' : 'playing',
       outcome: chess.outcome,
-      remainingMs: game.deadline === null ? null : Math.max(0, game.deadline - Date.now()),
+      clock: {
+        whiteMs: remainingMs(game.clock, 'w', Date.now()),
+        blackMs: remainingMs(game.clock, 'b', Date.now()),
+        running: game.clock.running,
+      },
+      timeControl: this.#timeControl,
       drawOffer: game.drawOffer,
     };
   }

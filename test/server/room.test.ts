@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseSquare } from '../../src/shared/chess/index.ts';
 import {
-  MOVE_TIME_LIMIT_MS,
   SEAT_RECONNECT_GRACE_MS,
   type ChatMessage,
   type RoomSnapshot,
 } from '../../src/shared/protocol.ts';
+import { TIME_CONTROL } from '../../src/shared/clock.ts';
 import { GameRoom, type Player } from '../../src/server/room.ts';
+
+/** White's full time at the start: initial time + the first increment. */
+const WHITE_START_MS = TIME_CONTROL.initialMs + TIME_CONTROL.incrementMs;
 import type { ParsedMove } from '../../src/server/validation.ts';
 
 let room: GameRoom;
@@ -93,7 +96,8 @@ describe('seats and game start', () => {
       status: 'playing',
       white: { id: white.id, name: 'white' },
       black: { id: black.id, name: 'black' },
-      remainingMs: MOVE_TIME_LIMIT_MS,
+      clock: { whiteMs: WHITE_START_MS, blackMs: TIME_CONTROL.initialMs, running: 'w' },
+      timeControl: TIME_CONTROL,
       moves: [],
     });
     expect(chat.at(-1)?.text).toBe('white(백)와 black(흑)의 대결을 시작합니다.');
@@ -177,36 +181,54 @@ describe('moves (server-authoritative)', () => {
     expect(game()).toMatchObject({
       status: 'finished',
       outcome: { winner: 'b', reason: 'checkmate' },
-      remainingMs: null,
+      clock: { running: null },
     });
     expect(chat.at(-1)?.text).toBe('체크메이트에 의해 black의 승리로 경기를 종료합니다.');
     expect(room.takeSeat(white)).toEqual({ ok: true });
   });
 });
 
-describe('per-move clock', () => {
-  it('loses on time when the side to move does not move within the limit', () => {
+describe('Fischer clock (15 min + 10 s)', () => {
+  it('loses on time when the side to move runs out of time', () => {
     startGame();
-    vi.advanceTimersByTime(MOVE_TIME_LIMIT_MS);
+    vi.advanceTimersByTime(WHITE_START_MS - 1);
+    expect(game().status).toBe('playing');
+    vi.advanceTimersByTime(1);
     expect(game()).toMatchObject({
       status: 'finished',
       outcome: { winner: 'b', reason: 'timeout' },
+      clock: { whiteMs: 0, running: null },
     });
   });
 
-  it('restarts the limit after each move', () => {
-    const { white } = startGame();
-    vi.advanceTimersByTime(MOVE_TIME_LIMIT_MS - 1000);
+  it('keeps unused time and adds the increment before each move', () => {
+    const { white, black } = startGame();
+    vi.advanceTimersByTime(30_000);
     room.move(white, move('e2e4', 0));
-    vi.advanceTimersByTime(MOVE_TIME_LIMIT_MS - 1000);
-    expect(game().status).toBe('playing');
-    vi.advanceTimersByTime(1000);
+    expect(game().clock).toEqual({
+      whiteMs: WHITE_START_MS - 30_000,
+      blackMs: TIME_CONTROL.initialMs + TIME_CONTROL.incrementMs,
+      running: 'b',
+    });
+    vi.advanceTimersByTime(5_000);
+    room.move(black, move('e7e5', 1));
+    expect(game().clock).toEqual({
+      whiteMs: WHITE_START_MS - 30_000 + TIME_CONTROL.incrementMs,
+      blackMs: TIME_CONTROL.initialMs + TIME_CONTROL.incrementMs - 5_000,
+      running: 'w',
+    });
+  });
+
+  it('flags the side to move using its accumulated time, not a per-move limit', () => {
+    const { white } = startGame();
+    room.move(white, move('e2e4', 0)); // black now has 15:10
+    vi.advanceTimersByTime(TIME_CONTROL.initialMs + TIME_CONTROL.incrementMs);
     expect(game().outcome).toEqual({ winner: 'w', reason: 'timeout' });
   });
 
-  it('rejects a move that arrives after the deadline even before the timer fires', () => {
+  it('rejects a move that arrives after the flag fall even before the timer fires', () => {
     const { white } = startGame();
-    vi.setSystemTime(Date.now() + MOVE_TIME_LIMIT_MS);
+    vi.setSystemTime(Date.now() + WHITE_START_MS);
     expect(room.move(white, move('e2e4', 0))).toEqual({ ok: false, error: 'no-game' });
     expect(game().outcome).toEqual({ winner: 'b', reason: 'timeout' });
   });
@@ -227,7 +249,7 @@ describe('disconnection during a game (FIDE Online Regulations 11.4)', () => {
     const { white, black } = startGame();
     room.disconnect(white);
     room.disconnect(black);
-    vi.advanceTimersByTime(MOVE_TIME_LIMIT_MS);
+    vi.advanceTimersByTime(WHITE_START_MS);
     expect(game().outcome).toEqual({ winner: 'b', reason: 'timeout' });
     const a = room.connect({ name: 'a' });
     const b = room.connect({ name: 'b' });

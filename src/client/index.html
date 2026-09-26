@@ -12,10 +12,6 @@
   <body>
     <header class="topbar">
       <h1 class="title">Chess</h1>
-      <div class="clock" id="clock" hidden>
-        <img class="clock-king" id="clock-king" src="/images/pieces/white_king.png" alt="" />
-        <span class="clock-time" id="clock-time" role="timer" aria-live="off">3:00</span>
-      </div>
       <div class="captured" aria-label="잡힌 기물">
         <div
           class="captured-row captured-white"
@@ -44,10 +40,17 @@
 
       <section class="panel" aria-label="대국 정보">
         <div class="players">
-          <span class="player player-1" id="player-1">(대기중)</span>
+          <div class="player-box">
+            <span class="player player-1" id="player-1">(대기중)</span>
+            <span class="clock" id="clock-1" role="timer" hidden></span>
+          </div>
           <span class="vs">VS</span>
-          <span class="player player-2" id="player-2">(대기중)</span>
+          <div class="player-box">
+            <span class="player player-2" id="player-2">(대기중)</span>
+            <span class="clock" id="clock-2" role="timer" hidden></span>
+          </div>
         </div>
+        <p class="time-control" id="time-control" hidden></p>
         <p class="status" id="status" role="status"></p>
         <ol class="moves" id="moves" aria-label="기보"></ol>
         <div class="controls">

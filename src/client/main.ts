@@ -28,9 +28,9 @@ const dom = {
   resultTitle: element('result-title', HTMLElement),
   resultReason: element('result-reason', HTMLElement),
   resultClose: element('result-close', HTMLButtonElement),
-  clock: element('clock', HTMLElement),
-  clockKing: element('clock-king', HTMLImageElement),
-  clockTime: element('clock-time', HTMLElement),
+  clock1: element('clock-1', HTMLElement),
+  clock2: element('clock-2', HTMLElement),
+  timeControl: element('time-control', HTMLElement),
   capturedWhite: element('captured-white', HTMLElement),
   capturedBlack: element('captured-black', HTMLElement),
   banner: element('connection-banner', HTMLElement),
@@ -345,25 +345,43 @@ function renderCaptured(row: HTMLElement, color: 'w' | 'b', pieces: readonly str
   );
 }
 
+/** Clocks under the player names: white left, black right (as in `view.players`). */
 function renderClock(): void {
   const clock = view.clock;
-  dom.clock.hidden = clock === null;
-  if (!clock) return;
-  const left = clock.remainingMs - (performance.now() - snapshotAt);
-  dom.clockTime.textContent = formatClock(left);
-  dom.clock.classList.toggle('low', left <= CLOCK_WARNING_MS);
-  const king = pieceImage({ color: clock.turn, type: 'k' });
-  if (dom.clockKing.getAttribute('src') !== king) dom.clockKing.src = king;
-  dom.clockKing.alt = clock.turn === 'w' ? '백 차례' : '흑 차례';
+  const game = state.room?.game;
+  dom.timeControl.hidden = !game;
+  if (game) {
+    const { initialMs, incrementMs } = game.timeControl;
+    dom.timeControl.textContent = `${String(initialMs / 60_000)}분 + ${String(incrementMs / 1000)}초 (수마다 추가)`;
+  }
+  const sides = [
+    [dom.clock1, 'w'],
+    [dom.clock2, 'b'],
+  ] as const;
+  for (const [node, color] of sides) {
+    node.hidden = clock === null;
+    if (!clock) continue;
+    const stored = color === 'w' ? clock.whiteMs : clock.blackMs;
+    const running = clock.running === color;
+    const left = running ? stored - (performance.now() - snapshotAt) : stored;
+    node.textContent = formatClock(left);
+    node.classList.toggle('running', running);
+    node.classList.toggle('low', left <= CLOCK_WARNING_MS);
+    node.setAttribute(
+      'aria-label',
+      `${color === 'w' ? '백' : '흑'} 남은 시간 ${formatClock(left)}`,
+    );
 
-  const key = `${String(state.room?.game?.id)}:${String(state.room?.game?.moves.length)}`;
-  if (left <= CLOCK_WARNING_MS && view.myColor === clock.turn && clockWarnedFor !== key) {
-    clockWarnedFor = key;
-    playSound('clockWarning');
+    // Warn once per game when the player's own time gets low.
+    const key = `${String(game?.id)}:${color}`;
+    if (running && left <= CLOCK_WARNING_MS && view.myColor === color && clockWarnedFor !== key) {
+      clockWarnedFor = key;
+      playSound('clockWarning');
+    }
   }
 }
 
-setInterval(renderClock, 250);
+setInterval(renderClock, 100);
 
 // ------------------------------------------------------------------ sounds
 

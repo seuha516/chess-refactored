@@ -2,9 +2,7 @@
 // state; clients send requests (acknowledged with an AckResult) and render the
 // RoomSnapshot the server broadcasts after every change.
 import type { Color, EndReason, PromotionPiece } from './chess/index.ts';
-
-/** Per-move time limit, kept from the original game ("3:00" per move). */
-export const MOVE_TIME_LIMIT_MS = 180_000;
+import type { TimeControl } from './clock.ts';
 /** A seated player who disconnects before the game starts keeps the seat this long. */
 export const SEAT_RECONNECT_GRACE_MS = 15_000;
 export const MAX_NAME_LENGTH = 16;
@@ -35,8 +33,13 @@ export interface GameSnapshot {
   readonly moves: readonly MoveInfo[];
   readonly status: 'playing' | 'finished';
   readonly outcome: { readonly winner: Color | null; readonly reason: EndReason } | null;
-  /** Milliseconds left for the side to move when the snapshot was sent. */
-  readonly remainingMs: number | null;
+  /** Time left for each side when the snapshot was sent; `running` is ticking. */
+  readonly clock: {
+    readonly whiteMs: number;
+    readonly blackMs: number;
+    readonly running: Color | null;
+  };
+  readonly timeControl: TimeControl;
   /** Colour of the player whose draw offer is pending. */
   readonly drawOffer: Color | null;
 }

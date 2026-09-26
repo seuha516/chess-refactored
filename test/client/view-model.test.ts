@@ -15,7 +15,8 @@ function game(overrides: Partial<GameSnapshot> = {}): GameSnapshot {
     moves: [],
     status: 'playing',
     outcome: null,
-    remainingMs: 180_000,
+    clock: { whiteMs: 910_000, blackMs: 900_000, running: 'w' },
+    timeControl: { initialMs: 900_000, incrementMs: 10_000 },
     drawOffer: null,
     ...overrides,
   };
@@ -94,7 +95,7 @@ describe('buildView', () => {
           ],
           status: 'finished',
           outcome: { winner: 'b', reason: 'checkmate' },
-          remainingMs: null,
+          clock: { whiteMs: 800_000, blackMs: 850_000, running: null },
         }),
       }),
     );
@@ -109,7 +110,7 @@ describe('buildView', () => {
       game({
         status: 'finished',
         outcome: { winner, reason: winner ? 'timeout' : 'agreement' },
-        remainingMs: null,
+        clock: { whiteMs: 1, blackMs: 2, running: null },
       });
     expect(buildView(state('carol', { game: finished('w') })).result).toEqual({
       title: '백 승리',
@@ -154,11 +155,19 @@ describe('buildView', () => {
 
 describe('formatClock', () => {
   it('formats minutes and seconds, rounding up', () => {
-    expect(formatClock(180_000)).toBe('3:00');
+    expect(formatClock(910_000)).toBe('15:10');
     expect(formatClock(179_001)).toBe('3:00');
     expect(formatClock(179_000)).toBe('2:59');
-    expect(formatClock(9_500)).toBe('0:10');
-    expect(formatClock(0)).toBe('0:00');
-    expect(formatClock(-50)).toBe('0:00');
+    expect(formatClock(10_000)).toBe('0:10');
+  });
+
+  it('shows tenths of a second below 10 seconds', () => {
+    expect(formatClock(9_999)).toBe('0:10');
+    expect(formatClock(9_900)).toBe('0:09.9');
+    expect(formatClock(9_400)).toBe('0:09.4');
+    expect(formatClock(9_401)).toBe('0:09.5');
+    expect(formatClock(50)).toBe('0:00.1');
+    expect(formatClock(0)).toBe('0:00.0');
+    expect(formatClock(-50)).toBe('0:00.0');
   });
 });

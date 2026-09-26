@@ -66,7 +66,12 @@ export interface ViewModel {
     readonly draw: DrawControl;
     readonly resign: boolean;
   };
-  readonly clock: { readonly turn: Color; readonly remainingMs: number } | null;
+  /** Both clocks while a game is played, as of the snapshot; `running` is ticking. */
+  readonly clock: {
+    readonly whiteMs: number;
+    readonly blackMs: number;
+    readonly running: Color | null;
+  } | null;
   readonly result: {
     readonly title: string;
     readonly reason: string;
@@ -138,10 +143,7 @@ export function buildView(state: ClientState): ViewModel {
       draw: drawControl(game, myColor),
       resign: myColor !== null,
     },
-    clock:
-      playing && game.remainingMs !== null
-        ? { turn: position.turn, remainingMs: game.remainingMs }
-        : null,
+    clock: playing ? game.clock : null,
     result: resultBanner(state, game, me),
     legalMoves: moves,
   };
@@ -227,8 +229,13 @@ function resultBanner(
     : { title: '패배', reason: reasonText, tone: 'loss' };
 }
 
-/** "m:ss", rounding up so the clock shows 0:00 only when time is really up. */
+/**
+ * "m:ss", with tenths below 10 seconds ("0:09.4"). Rounds up so the clock
+ * reads zero only when the time has really run out.
+ */
 export function formatClock(ms: number): string {
-  const seconds = Math.max(0, Math.ceil(ms / 1000));
+  const tenths = Math.ceil(Math.max(0, ms) / 100);
+  if (tenths < 100) return `0:0${String(Math.floor(tenths / 10))}.${String(tenths % 10)}`;
+  const seconds = Math.ceil(tenths / 10);
   return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, '0')}`;
 }
