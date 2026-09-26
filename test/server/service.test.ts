@@ -6,7 +6,12 @@ import {
   type RoomSnapshot,
 } from '../../src/shared/protocol.ts';
 import * as logic from '../../src/server/logic.ts';
-import { HEARTBEAT_MS, PRESENCE_TTL_MS, type SessionRecord } from '../../src/server/model.ts';
+import {
+  EMPTY_ROOM_GRACE_MS,
+  HEARTBEAT_MS,
+  PRESENCE_TTL_MS,
+  type SessionRecord,
+} from '../../src/server/model.ts';
 import { ChessService } from '../../src/server/service.ts';
 import { MemoryStore } from '../../src/server/store.ts';
 
@@ -137,11 +142,56 @@ describe('lobby and rooms', () => {
     expect(last(roomId)?.chat).toHaveLength(2);
   });
 
-  it('removes idle empty rooms without a game', async () => {
+  it('removes a room shortly after the last visitor leaves', async () => {
+    const alice = await player('Alice');
+    const roomId = await createAndJoin(alice, 'Alice-socket');
+    await service.act('Alice-socket', logic.takeSeat);
+    await service.leave('Alice-socket');
+    expect(lobbies.at(-1)?.rooms.map((room) => room.id)).toEqual([roomId]);
+    await vi.advanceTimersByTimeAsync(EMPTY_ROOM_GRACE_MS + 10);
+    expect(await store.getRoom(roomId)).toBeNull();
+    expect(lobbies.at(-1)?.rooms).toEqual([]);
+    expect(await service.join('Alice-socket', roomId)).toEqual({ ok: false, error: 'no-room' });
+  });
+
+  it('keeps a room whose visitor comes back quickly (page reload)', async () => {
+    const alice = await player('Alice');
+    const roomId = await createAndJoin(alice, 'Alice-socket');
+    await service.detach('Alice-socket');
+    await vi.advanceTimersByTimeAsync(EMPTY_ROOM_GRACE_MS / 2);
+    service.attach('Alice-socket-2', alice);
+    expect(await service.join('Alice-socket-2', roomId)).toEqual({ ok: true });
+    await vi.advanceTimersByTimeAsync(EMPTY_ROOM_GRACE_MS * 2);
+    expect(await store.getRoom(roomId)).not.toBeNull();
+  });
+
+  it('keeps a room while a spectator is still in it', async () => {
+    const alice = await player('Alice');
+    await player('Bob');
+    const roomId = await createAndJoin(alice, 'Alice-socket');
+    await service.join('Bob-socket', roomId);
+    await service.leave('Alice-socket');
+    await vi.advanceTimersByTimeAsync(EMPTY_ROOM_GRACE_MS * 2);
+    expect(await store.getRoom(roomId)).not.toBeNull();
+  });
+
+  it('removes a room once its game has ended after both players left', async () => {
+    const { roomId } = await startedRoom();
+    await service.detach('Alice-socket');
+    await service.detach('Bob-socket');
+    await vi.advanceTimersByTimeAsync(EMPTY_ROOM_GRACE_MS + 10);
+    expect(await store.getRoom(roomId)).not.toBeNull(); // still playing
+    await vi.advanceTimersByTimeAsync(DISCONNECT_FORFEIT_MS);
+    expect(await store.getRoom(roomId)).toBeNull();
+  });
+
+  it('removes abandoned rooms from the lobby without a local timer', async () => {
     const alice = await player('Alice');
     await createAndJoin(alice, 'Alice-socket');
     await service.leave('Alice-socket');
-    vi.advanceTimersByTime(11 * 60_000);
+    await service.createRoom(alice, 'Never entered');
+    service.dispose(); // simulate another instance: no local timers here
+    vi.setSystemTime(Date.now() + EMPTY_ROOM_GRACE_MS);
     expect((await service.lobby()).rooms).toEqual([]);
   });
 });

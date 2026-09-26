@@ -11,8 +11,8 @@ import {
 import {
   announceJoin,
   createRoom,
-  isPlaying,
   nextDeadline,
+  removableAt,
   resolve,
   toSnapshot,
   toSummary,
@@ -41,13 +41,12 @@ export interface ServiceOptions {
   readonly random?: () => number;
   readonly timeControl?: TimeControl;
   readonly maxRooms?: number;
-  /** Rooms without a game and without visitors are removed after this long. */
-  readonly roomIdleMs?: number;
   readonly heartbeatMs?: number;
 }
 
 export type RoomAction = (room: RoomRecord, player: PlayerRef, ctx: Context) => Transition;
 
+const isDue = (time: number | null, now: number): boolean => time !== null && time <= now;
 const newId = (bytes: number) => randomBytes(bytes).toString('base64url');
 const ok: AckResult = { ok: true };
 const fail = (error: ErrorCode): { ok: false; error: ErrorCode } => ({ ok: false, error });
@@ -63,7 +62,6 @@ export class ChessService {
   readonly #random: () => number;
   readonly #timeControl: TimeControl | undefined;
   readonly #maxRooms: number;
-  readonly #roomIdleMs: number;
 
   /** This instance's connections and the room each one is in. */
   readonly #connections = new Map<string, { roomId: string | null; player: PlayerRef }>();
@@ -77,7 +75,6 @@ export class ChessService {
     this.#random = options.random ?? Math.random;
     this.#timeControl = options.timeControl;
     this.#maxRooms = options.maxRooms ?? MAX_ROOMS;
-    this.#roomIdleMs = options.roomIdleMs ?? 10 * 60_000;
     this.#heartbeat = setInterval(() => {
       void this.#beat();
     }, options.heartbeatMs ?? HEARTBEAT_MS);
@@ -134,8 +131,9 @@ export class ChessService {
   // ------------------------------------------------------------------- lobby
 
   /**
-   * The room list. Also applies due time rules to each room and removes idle
-   * empty rooms, so rooms nobody visits any more do not accumulate.
+   * The room list. Also applies due time rules to each room and removes
+   * abandoned rooms, in case the instance that would have removed them
+   * (see #schedule) is gone.
    */
   async lobby(): Promise<LobbySnapshot> {
     const now = Date.now();
@@ -143,14 +141,11 @@ export class ChessService {
     const listed: RoomRecord[] = [];
     for (const room of rooms) {
       const presence = await this.#store.getPresence(room.id);
-      const empty = !Object.values(presence.connections).some(
-        (connection) => now - connection.seenAt < 60_000,
-      );
-      if (empty && !isPlaying(room) && now - room.updatedAt > this.#roomIdleMs) {
-        await this.#store.deleteRoom(room.id);
+      const resolved = resolve(room, presence, now);
+      if (isDue(removableAt(resolved, presence, now), now)) {
+        await this.#remove(room.id);
         continue;
       }
-      const resolved = resolve(room, presence, now);
       if (resolved !== room) {
         const updated = await this.#store.updateRoom(room.id, (current) => {
           const next = resolve(current, presence, now);
@@ -240,7 +235,10 @@ export class ChessService {
     return updated.result.ok ? ok : fail(updated.result.error);
   }
 
-  /** Applies due time rules to a room (timer, or a client whose clock hit zero). */
+  /**
+   * Applies due time rules to a room (timer, or a client whose clock hit
+   * zero), and removes the room once it has been left empty long enough.
+   */
   async sync(roomId: string): Promise<void> {
     const now = Date.now();
     const presence = await this.#store.getPresence(roomId);
@@ -248,8 +246,12 @@ export class ChessService {
       const next = resolve(room, presence, now);
       return { room: next === room ? null : next, result: undefined };
     });
-    if (updated?.changed) await this.#publish(updated.room, updated.before, presence);
-    else if (updated) this.#schedule(updated.room, presence);
+    if (!updated) return;
+    if (isDue(removableAt(updated.room, presence, now), now)) {
+      await this.#remove(roomId);
+      await this.#publishLobby();
+    } else if (updated.changed) await this.#publish(updated.room, updated.before, presence);
+    else this.#schedule(updated.room, presence);
   }
 
   /** Stops timers (shutdown, tests). */
@@ -275,13 +277,28 @@ export class ChessService {
     if (summaryChanged) await this.#publishLobby();
   }
 
-  /** Arms a local timer for the next time-based rule (flag fall, disconnection). */
-  #schedule(room: RoomRecord, presence: Presence): void {
-    const existing = this.#timers.get(room.id);
+  async #remove(roomId: string): Promise<void> {
+    this.#clearTimer(roomId);
+    await this.#store.deleteRoom(roomId);
+  }
+
+  #clearTimer(roomId: string): void {
+    const existing = this.#timers.get(roomId);
     if (existing) clearTimeout(existing);
-    this.#timers.delete(room.id);
-    const deadline = nextDeadline(room, presence, Date.now());
-    if (deadline === null) return;
+    this.#timers.delete(roomId);
+  }
+
+  /**
+   * Arms a local timer for the next time-based rule (flag fall,
+   * disconnection) or for removing the room once it is abandoned.
+   */
+  #schedule(room: RoomRecord, presence: Presence): void {
+    this.#clearTimer(room.id);
+    const now = Date.now();
+    const deadlines = [nextDeadline(room, presence, now), removableAt(room, presence, now)];
+    const due = deadlines.filter((time) => time !== null);
+    if (due.length === 0) return;
+    const deadline = Math.min(...due);
     const timer = setTimeout(
       () => {
         this.#timers.delete(room.id);

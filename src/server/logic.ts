@@ -33,6 +33,7 @@ import {
   type RoomSummary,
 } from '../shared/protocol.ts';
 import {
+  EMPTY_ROOM_GRACE_MS,
   PRESENCE_TTL_MS,
   type GameRecord,
   type PlayerRef,
@@ -258,6 +259,22 @@ export function nextDeadline(room: RoomRecord, presence: Presence, now: number):
     }
   }
   return times.length ? Math.min(...times) : null;
+}
+
+/**
+ * When the room may be removed: EMPTY_ROOM_GRACE_MS after the last visitor
+ * left (or after it was created, if nobody ever came in). Null while someone
+ * is in it or a game is in progress.
+ */
+export function removableAt(room: RoomRecord, presence: Presence, now: number): number | null {
+  if (isPlaying(room) || onlineCount(presence, now) > 0) return null;
+  let emptySince = room.createdAt;
+  for (const at of Object.values(presence.leftAt)) emptySince = Math.max(emptySince, at);
+  // Stale entries count as gone since their last refresh.
+  for (const connection of Object.values(presence.connections)) {
+    emptySince = Math.max(emptySince, connection.seenAt);
+  }
+  return emptySince + EMPTY_ROOM_GRACE_MS;
 }
 
 /** Announces a player entering the room, unless they were just here (reconnects). */

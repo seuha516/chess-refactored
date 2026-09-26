@@ -62,3 +62,8 @@ export interface Presence {
 export const EMPTY_PRESENCE: Presence = { connections: {}, leftAt: {} };
 export const HEARTBEAT_MS = 15_000;
 export const PRESENCE_TTL_MS = 40_000;
+/**
+ * A room without a game in progress is removed once nobody has been in it
+ * for this long (long enough to survive a page reload).
+ */
+export const EMPTY_ROOM_GRACE_MS = 15_000;
