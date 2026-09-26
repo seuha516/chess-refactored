@@ -100,8 +100,6 @@ export interface BoardPresenter {
   dragEnd(): void;
 }
 
-type Tier = 'high' | 'low';
-
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const coarse = window.matchMedia('(pointer: coarse)');
 
@@ -139,32 +137,35 @@ function gravePosition(side: Color, index: number, target = new Vector3()): Vect
   return target.set(sign * (5.2 + column * 0.82), BOARD_Y, sign * (3.55 - row * 0.98));
 }
 
-function detectTier(): Tier | null {
+/**
+ * Whether this browser can draw the table smoothly: WebGL 2 on a GPU.
+ * Software rendering (no GPU) would turn every move into a slideshow and
+ * starve the page, so it gets the 2D board instead.
+ */
+function hasGpu(): boolean {
   try {
     const probe = document.createElement('canvas');
     const gl = probe.getContext('webgl2');
-    if (!gl) return null;
+    if (!gl) return false;
     const info = gl.getExtension('WEBGL_debug_renderer_info');
     const name = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
     gl.getExtension('WEBGL_lose_context')?.loseContext();
-    // Software rendering (no GPU): keep the scene, drop the costly parts.
-    return /swiftshader|llvmpipe|software|basic render/i.test(name) ? 'low' : 'high';
+    return !/swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
   } catch {
-    return null;
+    return false;
   }
 }
 
 /** Creates the table, or returns null when this browser cannot draw it. */
 export async function createStage(): Promise<TableStage | null> {
-  const tier = detectTier();
-  if (!tier) return null;
+  if (!hasGpu()) return null;
   // The coordinates are engraved in the display face; wait for it briefly.
   await Promise.race([
     document.fonts.load('600 32px "Hahmlet Variable"').catch(() => undefined),
     new Promise((resolve) => setTimeout(resolve, 1500)),
   ]);
   try {
-    return new TableStage(tier);
+    return new TableStage();
   } catch {
     return null;
   }
@@ -229,7 +230,6 @@ interface Particle {
 }
 
 export class TableStage implements BoardPresenter {
-  readonly #tier: Tier;
   readonly #renderer: WebGLRenderer;
   readonly #scene = new Scene();
   readonly #camera = new PerspectiveCamera(30, 1, 0.5, 220);
@@ -293,20 +293,17 @@ export class TableStage implements BoardPresenter {
   readonly #raycaster = new Raycaster();
   readonly #plane = new Plane(new Vector3(0, 1, 0), -DRAG_LIFT);
 
-  constructor(tier: Tier) {
-    this.#tier = tier;
+  constructor() {
     this.#renderer = new WebGLRenderer({
-      antialias: tier === 'high',
+      antialias: true,
       powerPreference: 'high-performance',
     });
     const renderer = this.#renderer;
-    renderer.setPixelRatio(
-      tier === 'high' ? Math.min(window.devicePixelRatio, coarse.matches ? 2 : 2) : 1,
-    );
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = SRGBColorSpace;
     renderer.toneMapping = ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
-    renderer.shadowMap.enabled = tier === 'high';
+    renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = PCFShadowMap;
     renderer.domElement.className = 'scene-canvas';
     renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -321,8 +318,8 @@ export class TableStage implements BoardPresenter {
     const sun = new SpotLight('#ffd7a3', 3.4, 0, 0.36, 0.25, 0);
     sun.position.set(-30, 23, -13);
     sun.target.position.set(0, 0, 0);
-    sun.map = canopyTexture(tier === 'high' ? 512 : 256);
-    sun.castShadow = tier === 'high';
+    sun.map = canopyTexture(512);
+    sun.castShadow = true;
     sun.shadow.mapSize.set(coarse.matches ? 1024 : 2048, coarse.matches ? 1024 : 2048);
     sun.shadow.bias = -0.0003;
     sun.shadow.radius = 4;
@@ -332,13 +329,6 @@ export class TableStage implements BoardPresenter {
     sun.shadow.camera.far = 80;
     scene.add(sun, sun.target);
     this.#sun = sun;
-    // A tier without shadows still needs the cookie, which three.js only
-    // projects for shadow-casting spots; keep the light's shadow but tiny.
-    if (tier === 'low') {
-      sun.castShadow = true;
-      sun.shadow.mapSize.set(256, 256);
-      renderer.shadowMap.enabled = true;
-    }
     scene.add(new HemisphereLight('#a7c0c2', '#4a3b28', 1.05));
     scene.add(this.#flash);
 
@@ -441,7 +431,7 @@ export class TableStage implements BoardPresenter {
     });
     slabGeometry.rotateX(-Math.PI / 2);
     slabGeometry.translate(0, -(SLAB_H + bevel), 0);
-    const density = this.#tier === 'high' ? 112 : 64;
+    const density = 112;
     const faces = {
       w: slabTexture(SLAB_W, SLAB_D, density, 'w'),
       b: slabTexture(SLAB_W, SLAB_D, density, 'b'),
@@ -478,7 +468,7 @@ export class TableStage implements BoardPresenter {
     };
 
     // The inlaid playing field.
-    const inlay = boardTextures(this.#tier === 'high' ? 1024 : 512);
+    const inlay = boardTextures(1024);
     inlay.map.anisotropy = anisotropy;
     const board = new Mesh(
       new PlaneGeometry(8, 8),
@@ -614,7 +604,7 @@ export class TableStage implements BoardPresenter {
       new MeshStandardMaterial({ color: '#bdb5a4', roughness: 0.6 }),
       count,
     );
-    mesh.castShadow = this.#tier === 'high';
+    mesh.castShadow = true;
     mesh.frustumCulled = false;
     const hidden = new Matrix4().makeScale(0, 0, 0);
     for (let i = 0; i < count; i++) mesh.setMatrixAt(i, hidden);
@@ -934,7 +924,7 @@ export class TableStage implements BoardPresenter {
     this.#updateMarkers(realDt);
 
     // The canopy sways a little in the wind.
-    const still = reducedMotion.matches || this.#tier === 'low';
+    const still = reducedMotion.matches;
     if (!still) {
       const t = this.#time;
       this.#sun.target.position.set(

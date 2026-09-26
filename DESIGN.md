@@ -249,7 +249,7 @@ for a draw offer or someone sitting down. A toggle in the top bar, remembered in
 ### Stage and board
 
 `.scene` holds the canvas and the DOM board; the board is a 512px grid mapped onto the 3D board
-with a `matrix3d` homography, transparent, with a 4px sunlight focus ring. Without WebGL the same
+with a `matrix3d` homography, transparent, with a 4px sunlight focus ring. Without WebGL, or on software rendering (no GPU), the same
 grid is the 2D board (travertine/slate, SVG pieces, granite rim).
 
 ### Buttons
